@@ -1,6 +1,7 @@
 import re
 import json
 import config
+import os
 
 from playwright.sync_api import sync_playwright
 
@@ -16,6 +17,7 @@ class Rakuraku:
         self.page=None
         self.timeout=10000
         self.valuable_headers = ['record_td_0_0_99-137222','record_td_0_0_99-137224','record_td_0_0_99-137226']
+        self.main_frame=None
         return
     def log_in(self):
         playwright=sync_playwright().start()
@@ -44,18 +46,17 @@ class Rakuraku:
         print("Clicked トラスコ発注 (treeViewData_12_span) in menu iframe.")
 
         self.page.wait_for_selector('iframe#main',timeout=self.timeout)
-        main_frame=self.page.frame(name="main")
-        
-        main_frame.wait_for_load_state('domcontentloaded', timeout=self.timeout)
+        self.main_frame=self.page.frame(name="main")
+        self.main_frame.wait_for_load_state('domcontentloaded', timeout=self.timeout)
         # Now get HTML and text
-        main_html = main_frame.content()
+        main_html = self.main_frame.content()
         with open("main_frame_after_click.html", "w", encoding="utf-8") as f:
             f.write(main_html)
         print("Saved main_frame_after_click.html")
-        
-        main_frame.wait_for_selector('table#tableRecordFix',timeout=self.timeout)
-        table=main_frame.query_selector('table#tableRecordFix')
-        
+
+        self.main_frame.wait_for_selector('table#tableRecordFix',timeout=self.timeout)
+        table=self.main_frame.query_selector('table#tableRecordFix')
+
         #Get the headers
         # headers=[]
         # headers_row=table.query_selector_all('tr')
@@ -67,7 +68,7 @@ class Rakuraku:
         #         if th_id and th_text:
         #             headers.append({'id': th_id, 'text': th_text})
         #Get data rows
-        all_rows=[]
+        all_rows={}
         BREAK_POINT='発注済'
         found_break_point=False
         
@@ -76,14 +77,15 @@ class Rakuraku:
             tds=row.query_selector_all('td')
             row_data=[]
             row_id=row.get_attribute('id')
-            if row_id=='null':
+            if not row_id:
                 continue
-            for td in tds:
-                td_id=td.get_attribute('id')
-                td_text=td.text_content().strip()
-                #I need to get the 2nd td too
-                if td_id in self.valuable_headers:
+            for idx, td in enumerate(tds):
+                td_id = td.get_attribute('id')
+                td_text = td.text_content().strip()
+                if idx in [1, 2, 6, 7, 8, 11, 12, 13]:
                     row_data.append({'id': td_id, 'text': td_text})
+                # elif td_id in self.valuable_headers:
+                #     row_data.append({'id': td_id, 'text': td_text})
                 if td_text==BREAK_POINT:
                     found_break_point=True
                     break
@@ -93,12 +95,63 @@ class Rakuraku:
                 else:
                     all_rows[row_id] = row_data
         with open("table_data.json", "w", encoding="utf-8") as f:
-            json.dump({'rows': all_rows}, f, ensure_ascii=False, indent=4)
+            json.dump(all_rows, f, ensure_ascii=False, indent=4)
         self.page.screenshot(path="screenshot_after_login.png")
         print("Screenshot saved as 'screenshot_after_login.png'")     
         
-    def search_order(self):
-        return 
+    def get_download(self,listfile="table_data.json",download_dir="Downloads"):
+        """
+        For each row in the JSON, click the download link in the 7th column if it exists,
+        and save the file to the specified directory.
+        """
+    
+        try:
+            with open(listfile, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"Error reading {listfile}: {e}")
+            return
+        #just in case I get on the wrong page
+        print(data)
+        self.main_frame.wait_for_selector('table#tableRecordFix', timeout=self.timeout)
+        table = self.main_frame.query_selector('table#tableRecordFix')
+        
+        #Create the download directory if it doesn't exist
+        try:
+            os.makedirs(download_dir, exist_ok=True)
+        except Exception as e:
+            print(f"Error creating download directory {download_dir}: {e}")
+            return
+        try:
+            for row_id, row_cells in data.items():
+                # Process each row as needed
+                print(f"Row ID: {row_id}, Data: {row_cells}")
+                tr=self.main_frame.query_selector(f'tr#{row_id}')
+                if not tr:
+                    print(f"Row {row_id} not found in the table.")
+                    continue
+                tds= tr.query_selector_all('td')
+                if len(tds) >6: #index 6 is the 7th column
+                    td =tds[6]
+                    a_tag = td.query_selector('a')
+                    if a_tag:
+                        with self.main_frame.expect_download() as download_info:
+                            a_tag.click()
+                        download= download_info.value
+                        #save file to the specified directory
+                        download_path = os.path.join(download_dir, download.suggested_filename)
+                        download.save_as(save_path=download_path)
+                        print(f"Downloaded file for row {row_id} to {download_path}")
+                        row_cells.append({"id": "downloaded_file", "text": download_path})
+                    else:
+                        print(f"No download link found in row {row_id}.")
+                else:
+                    print(f"Row {row_id} does not have enough columns for a download link.")
+        except Exception as e:
+            print(f"Error processing rows: {e}")
+            return   
+
+
     def handle_information(self,filename="table_data.json"):
         with open(filename, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -152,5 +205,5 @@ if __name__ == "__main__":
     agent=Rakuraku()
     agent.log_in()
     agent.get_page_info()
-    input("Press enter to close")
+    agent.get_download()
     agent.close()
