@@ -1,92 +1,54 @@
 {
-    "recordTr_240113_0": [
+    "recordTr_240508_0": [
         {
-            "id": "recordAct_240113",
-            "text": ""
+            "recordAct_240508": ""
         },
         {
-            "id": null,
-            "text": "発注書作成\n                見積書作成"
+            "order_number": "1175343"
         },
         {
-            "id": "record_td_0_0_99-137219",
-            "text": "1174948"
+            "record_td_0_0_99-137221": ""
         },
         {
-            "id": "record_td_0_0_99-137221",
-            "text": ""
+            "record_td_0_0_99-137222": ""
         },
         {
-            "id": "record_td_0_0_99-137222",
-            "text": ""
+            "product_code": "hcvalor2-10083967"
         },
         {
-            "id": "record_td_0_0_99-137224",
-            "text": "361674-20250725-0084308326"
+            "download_code": "8520181"
         },
         {
-            "id": "record_td_0_0_99-137229",
-            "text": "3424775"
+            "description": "■ENERPAC 油圧単動シリンダ 揚力100kN ストローク155mm【8520181:0】[送料別途見積り][店頭受取不可]"
         },
         {
-            "id": "record_td_0_0_99-137226",
-            "text": "■HEIKO 手提げ紙袋 ブライトバッグ チョコブラウン(MT) C1 10枚入り〔品番:006459502〕【3424775:0】[送料別途見積り][掲外取寄][店頭受取不可](trusco-3424775)"
+            "downloaded_file": "Downloads\\MTR1175343.xlsm"
         }
     ],
-    "recordTr_240112_0": [
+    "recordTr_240507_0": [
         {
-            "id": "recordAct_240112",
-            "text": ""
+            "recordAct_240507": ""
         },
         {
-            "id": null,
-            "text": "発注書作成\n                見積書作成"
+            "order_number": "1175342"
         },
         {
-            "id": "record_td_1_0_99-137219",
-            "text": "1174947"
+            "record_td_1_0_99-137221": ""
         },
         {
-            "id": "record_td_1_0_99-137221",
-            "text": ""
+            "product_code": ""
         },
         {
-            "id": "record_td_1_0_99-137222",
-            "text": ""
+            "product_code": "361674-20250730-0390209524"
         },
         {
-            "id": "record_td_1_0_99-137224",
-            "text": "361674-20250725-0041008437"
+            "download_code": "5590489"
         },
         {
-            "id": "record_td_1_0_99-137229",
-            "text": "8614234"
+            "description": "■PISCO チューブフィッティングSUS316〔品番:SSPL1001〕【5590489:0】[送料別途見積り][掲外取寄][店頭受取不可](trusco-5590489)"
         },
         {
-            "id": "record_td_1_0_99-137226",
-            "text": "■ジーベック リブ付カーゴパンツ2159-64-3L〔品番:2159643L〕【8614234:0】[送料別途見積り][掲外取寄][店頭受取不可](trusco-8614234)"
-        }
-    ],
-    "recordTr_240112_1": [
-        {
-            "id": "record_td_1_1_99-140117",
-            "text": "21.6%"
-        },
-        {
-            "id": "record_td_1_1_99-137224",
-            "text": "361674-20250725-0041008437"
-        },
-        {
-            "id": "record_td_1_1_99-137227",
-            "text": "2"
-        },
-        {
-            "id": "record_td_1_1_99-137230",
-            "text": "1"
-        },
-        {
-            "id": "record_td_1_1_99-137231",
-            "text": "2"
+            "downloaded_file": "Downloads\\MTR1175342.xlsm"
         }
     ]
 }
