@@ -3,12 +3,13 @@ import json
 import config
 import os
 import poplib
-import email
 import time
 
 from email.parser import BytesParser
 from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError #Handle POp up window check
 
+from GoQ import GoQ
 
 
 class Rakuraku:
@@ -111,7 +112,7 @@ class Rakuraku:
         print("Screenshot saved as 'screenshot_after_login.png'")     
         
     
-    def change_json_key_name(self):
+    def refactor_json(self):
         try:
             with open(self.file_name, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -131,8 +132,13 @@ class Rakuraku:
                     if i == 1:
                         
                         updated_list.append({"order_number": value})
-                    elif i == 4:
+                    elif i == 4:                        
                         updated_list.append({"product_code": value})
+                        parts = value.split('-')
+                        if len(parts) >= 3:
+                            short_code = "-".join(parts[-2:])
+                            updated_list.append({"product_code": short_code})
+                        
                     elif i == 5:
                         updated_list.append({"download_code": value})
                     elif i == 6:
@@ -140,7 +146,7 @@ class Rakuraku:
                     else:
                         updated_list.append(item)  # keep as-is
 
-
+           
             # Replace the list with the updated one
                 data[outer_key] = updated_list
 
@@ -184,15 +190,19 @@ class Rakuraku:
                     break
                 description = description_cell.text_content().strip()
                 # Temporaraly we will not handle the case when there are more than 2 lines
+                #As well as update the download file_name                
                 if self.main_frame.query_selector('#record_td_0_1_99-137222'):
                     continue
                 if "送料別途見積り" in description:
-                    download_button = self.create_mitsukomi
+                    download_button = self.create_mitsukomi                
+                    
                 elif "法人・事業所限定" in description:
-                    download_button = self.create_order
+                    download_button = self.create_order                    
                 else:
                     download_button=None
                     print("Can not download")
+                
+                
                 #click the button to trigger
                 print(f"Processing row with description: {description}")
             
@@ -200,9 +210,9 @@ class Rakuraku:
                 print(f"Clicked download button for row .")
                 self.page.wait_for_selector('iframe#main', timeout=self.timeout)
                 self.main_frame = self.page.frame(name="main")
-                self.main_frame.wait_for_load_state('domcontentloaded', timeout=self.timeout)
-                
+                self.main_frame.wait_for_load_state('domcontentloaded', timeout=self.timeout)                
                 self.main_frame.wait_for_selector('table#tableRecordFix', timeout=self.timeout)
+                time.sleep(1)
 
             except Exception as e:
                 print(f"Error clicking download button for row : {e}")               
@@ -261,16 +271,7 @@ class Rakuraku:
         
     def close(self):
         if self.browser:
-            self.browser.close()
-    
-class GoQ:
-    def __init__(self):
-        return    
-    def log_in(self):
-        return
-    def upload_file(self):
-        return
-    
+            self.browser.close()      
     
 class Orange:
     def __init__(self):
@@ -286,8 +287,6 @@ class Orange:
         self.MTR_link="https://www.orange-book.com/ja/f/view/OB3110S23001.xhtml?definiteFileType=2"
         self.TRI_link="https://www.orange-book.com/ja/f/view/OB3110S23001.xhtml?definiteFileType=1"
         return
-    def load_cookies(self, context):
-        context.add_cookies(config.ORANGE_COOKIES)
     def log_in(self):
         playwright=sync_playwright().start()
         self.browser = playwright.chromium.launch(headless=False)
@@ -374,42 +373,119 @@ class Orange:
         except Exception as e:
             print(f"POP3 Error: {e}")
             return None
+    def connect_existing_browser(self):
+        from playwright.sync_api import sync_playwright
+
+        self.playwright = sync_playwright().start()
+        self.browser = self.playwright.chromium.connect_over_cdp("http://localhost:9222")
+        context = self.browser.contexts[0]
+        self.page = context.pages[0] if context.pages else context.new_page()
+        print(" Connected to Chrome")
+
     
-    def start_import(self):
+    def start_import(self):       
         with open(self.file_name, "r", encoding="utf-8") as f:
             datas = json.load(f)
         try:
             for row_id, records in datas.items():
-                print(row_id)
+                print(f"[Processing row: {row_id}]")
+
+                #  Flatten the list of dicts into one single dict
+                record = {}
                 for item in records:
-                    if isinstance(item, dict) and "description" in item:
-                        if "送料別途見積り" in item["description"]:
-                            print(f"MTR: {row_id}")
-                            self.page.goto(self.MTR_link)
-                            self.page.wait_for_load_state('networkidle')
-                            
-                        elif "法人・事業所限定" in item["description"]:
-                            print(f"TRI: {row_id}")
+                    if isinstance(item, dict):
+                        record.update(item)
+
+                description = record.get("description", "")
+                downloaded_file = record.get("downloaded_file")
+                product_code = record.get("product_code")
+
+                # ========== Case: 見積り ==========
+                if "送料別途見積り" in description:
+                    self.page.goto(self.MTR_link)
+
+                    # Unhide file input
+                    self.page.wait_for_selector('button.js-attachmentfile__btn', timeout=self.timeout)
+                    self.page.eval_on_selector('input#fileInput', 'el => el.removeAttribute("hidden")')
+
+                    # Upload file
+                    if downloaded_file:
+                        print(f"Uploading file: {downloaded_file}")
+                        self.page.set_input_files('input#fileInput', downloaded_file)
+                    else:
+                        print(f"[Error] Missing 'downloaded_file' for row {row_id}")
+                        continue
+
+                    # Confirm filename was set in UI
+                    filename_field = self.page.query_selector('input#inputFileName')
+                    if filename_field:
+                        print("UI shows:", filename_field.input_value())
+
+                    
+                    self.page.click('#btn-excelin')
+                    # Select radio option
+                    self.page.wait_for_selector('label:has(input#deliveryKbn_4)')
+                    self.page.click('label:has(input#deliveryKbn_4)')
+
+                    # Fill product code
+                    self.page.wait_for_selector('input#abstr', timeout=self.timeout)
+                    # self.page.fill('input#abstr', product_code)
+
+                    # Check for error field after filling
+                    value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
+
+                    if value:
+                        # Check if clickable <a> element exists
+                        warning = self.page.query_selector('p.p-warning--type-02.u-font14')
+                        if warning:
+                            warning_text = warning.text_content().strip()
+                            record["error"] = warning_text or f"Cannot order article: {value}"
+                            print(f"[Error] {record['error']}")
+                            continue
+                        else:
+                            # All good → click confirm
+                            self.page.click("#btn-estimateConfirm")
+
+                    
+                    time.sleep(5)
+
+                # ========== Case: TRI ==========
+                elif "法人・事業所限定" in description:
+                    print(f"[TRI case] Row ID: {row_id}")
+                datas[row_id] = [record]
         except Exception as e:
-            print(f"Json Content Error: {e}")
+            print(f"[Exception] Json Content Error: {e}")
             return None
-              
+        with open(self.file_name, "w", encoding="utf-8") as f:
+            json.dump(datas, f, ensure_ascii=False, indent=2)
+        print("[Done] Updated data saved.")
             
     def search_order(self)->str:
         return url
     
-    
+
+
     
 if __name__ == "__main__":
-    agent=Rakuraku()
-    agent.change_json_key_name()
-    # agent.log_in()
-    # agent.get_page_info()
-    # agent.get_download_link()
-    # agent.start_download()
-    # agent.close()
-    orange=Orange()
-    orange.start_import()
-    # orange.log_in()
+    agent=Rakuraku()    
+    agent.log_in()
+    agent.get_page_info()
+    agent. refactor_json()
+    agent.get_download_link()
+    agent.start_download()
+    agent.refactor_json()
+    agent.close()
+    
+    orange=Orange()    
+    # orange.log_in()    
     # orange.fetch_auth_code_from_email()
+    # orange.connect_existing_browser()
+    # orange.start_import()
+    
+    goq=GoQ()
+    goq.log_in()
+    # goq.connect_existing_browser()
+    goq.searching()
+    
+    
     
