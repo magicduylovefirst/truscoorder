@@ -35,7 +35,7 @@ class GoQ:
         self.page.fill('form#js-loginForm >> input[name="password"]', self.password)
         self.page.click('form#js-loginForm >> button[type="submit"]')
         #This step will confirm the auth
-        # self.page.wait_for_load_state("load")
+        self.page.wait_for_load_state("load")
         try:
             # Step 1: Check if GoQ login screen appears first
             goq_auth_btn = self.page.locator("button#js-loginGoqAuth")
@@ -228,6 +228,94 @@ class GoQ:
             print(f"[Error] Failed to search or open detail for {product_code}: {e}")
             return None
 
+    def import_result(self, tab, additional_text=""):
+        try:
+            print("[Action] Looking for 対応履歴 table...")
+
+            # 1) Find ALL tables that have a TD containing '対応履歴'
+            candidates = tab.locator('table').filter(has=tab.locator('td:has-text("対応履歴")'))
+            n = candidates.count()
+            if n == 0:
+                print("[Warning] No tables containing '対応履歴'. Dumping page...")
+                with open("page_dump.html", "w", encoding="utf-8") as f:
+                    f.write(tab.content())
+                return False
+
+            print(f"[Info] Found {n} candidate table(s). Saving each for debugging...")
+            chosen_idx = None
+
+            # 2) Save each candidate and pick the best one
+            for i in range(n):
+                t = candidates.nth(i)
+                html = t.evaluate("el => el.outerHTML")
+                with open(f"history_table_candidate_{i}.html", "w", encoding="utf-8") as f:
+                    f.write(html)
+
+                has_datetime_link = t.locator('a:has-text("日時を追加")').count() > 0
+                has_textarea = t.locator("textarea#a52").count() > 0
+
+                print(f"[Info] Candidate {i}: has_datetime_link={has_datetime_link}, has_textarea={has_textarea}")
+
+                # Prefer a table that has the link; fallback to one with the textarea
+                if chosen_idx is None and (has_datetime_link or has_textarea):
+                    chosen_idx = i
+
+            # If still not chosen, default to the last one (often the detailed block)
+            if chosen_idx is None:
+                chosen_idx = n - 1
+                print(f"[Info] No strong match; falling back to candidate {chosen_idx}")
+
+            history_table = candidates.nth(chosen_idx)
+            table_html = history_table.evaluate("el => el.outerHTML")
+            with open("history_table.html", "w", encoding="utf-8") as f:
+                f.write(table_html)
+            print(f"[Saved] history_table.html (chosen candidate {chosen_idx})")
+
+            # 3) Try to get and save the '日時を追加' link HTML (if present)
+            datetime_link = history_table.locator('a:has-text("日時を追加")').first
+            if datetime_link.count() > 0:
+                link_html = datetime_link.evaluate("el => el.outerHTML")
+                with open("datetime_link.html", "w", encoding="utf-8") as f:
+                    f.write(link_html)
+                print("[Saved] datetime_link.html")
+            else:
+                print("[Warning] '日時を追加' link not found in chosen table")
+
+            # 4) Click the link if it exists and is (likely) actionable
+            if datetime_link.count() > 0:
+                print("[Action] Clicking 日時を追加 link...")
+                datetime_link.click()
+                tab.wait_for_timeout(1000)
+
+            # 5) Interact with textarea if present
+            textarea = history_table.locator("textarea#a52")
+            if textarea.count() == 0:
+                print("[Warning] Textarea #a52 not found")
+                return False
+
+            current_content = textarea.input_value()
+            print(f"[Info] Current textarea content: {current_content}")
+
+            if additional_text:
+                new_content = current_content + additional_text
+                textarea.fill(new_content)
+                print(f"[Success] Import result added to textarea: {additional_text}")
+                return new_content
+            else:
+                print("[Success] Datetime added to textarea (no extra text)")
+                return current_content
+
+        except Exception as e:
+            print(f"[Error] Failed to import result: {e}")
+            # Optional: dump page on error
+            try:
+                with open("page_dump_on_error.html", "w", encoding="utf-8") as f:
+                    f.write(tab.content())
+                print("[Saved] page_dump_on_error.html")
+            except Exception:
+                pass
+            return False
+
     def process_detail_tab(self, tab,product_code,output_file="details.json"):        
         tab.wait_for_load_state("domcontentloaded")
         print(f"[DEBUG] Processing detail tab for product_code: {product_code}")
@@ -278,10 +366,12 @@ class GoQ:
                     break
         
         # Split filtered address into components
-        address_parts = filtered_address.split()
-        address1 = address_parts[0] if len(address_parts) > 0 else ""
-        address2 = address_parts[1] if len(address_parts) > 1 else ""
-        address3 = " ".join(address_parts[2:]) if len(address_parts) > 2 else ""
+        # Simple split by 20 characters each
+        addr = filtered_address.strip()
+
+        address1 = addr[:20]
+        address2 = addr[20:40] if len(addr) > 20 else ""
+        address3 = addr[40:60] if len(addr) > 40 else ""
         print(f"[DEBUG] Address parts: address1='{address1}', address2='{address2}', address3='{address3}'")
         
         result = {
@@ -296,6 +386,10 @@ class GoQ:
         "address2": address2,
         "address3": address3
         }
+        
+        # Import result to history table (using the correct tab parameter)
+        self.import_result(tab, additional_text=f"\n処理完了 - 商品コード: {product_code}")
+        time.sleep(20)
         print(f"[DEBUG] Final result: {json.dumps(result, ensure_ascii=False, indent=2)}")
         
         with open(output_file, "w", encoding="utf-8") as f:
@@ -313,11 +407,24 @@ if __name__ == "__main__":
 広島県尾道市西御所町14-22
 TEL： 0848-23-2001
 """
-    goq=GoQ()
-    # goq.log_in()
+    # Simple test - create GoQ with None context for testing
+    goq = GoQ(None)
     
-    goq.connect_existing_browser()
-    goq.searching()
-    # agent = CustomerInfoExtractor(api_key=config.GEMINI_API)
-    # result = agent.extract(html_block)
-    # print(result)
+    # Test the connect_existing_browser method
+    try:
+        goq.connect_existing_browser()
+        print("[Success] Connected to existing Chrome browser")
+        print(f"[Info] Current page URL: {goq.page.url}")
+        
+        # Test searching if we have data file
+        if os.path.exists(goq.file_name):
+            print(f"[Info] Found data file {goq.file_name}, starting search process")
+            goq.searching()
+        else:
+            print(f"[Info] No data file {goq.file_name} found for searching")
+            
+    except Exception as e:
+        print(f"[Error] Failed during browser operations: {e}")
+        print(f"[Info] This is normal if browser/page was closed or if you need to login first")
+   
+    # Note: import_result requires a tab parameter and would be called within process_detail_tab
