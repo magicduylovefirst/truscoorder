@@ -4,33 +4,32 @@ import config
 import os
 import poplib
 import time
+from var import corp_keywords
 
 from email.parser import BytesParser
 from playwright.sync_api import sync_playwright
 from playwright.sync_api import TimeoutError #Handle POp up window check
 
+
+
 class GoQ:
-    def __init__(self):
+    def __init__(self,context, orange_instance=None):
         self.url=config.GOQ_URL
         self.url_login=config.GOQ_LOGIN_URL
         self.username=config.GOQ_USER
         self.password=config.GOQ_PASS
         self.browser = None
-        self.context=None
+        self.context=context
         self.page=None
         self.timeout=10000       
         self.main_frame=None
         self.file_name="table_data.json"
-        #AI
-        self.gemini_api_key=config.GEMINI_API
-        self.chat=None
+        self.orange = orange_instance
         return
+    
     def log_in(self):
         #temporarialy comment out for testing
-        playwright=sync_playwright().start()
-        self.browser = playwright.chromium.launch(headless=False)
-        self.context = self.browser.new_context()
-        self.page = self.browser.new_page()
+        self.page = self.context.new_page()
         self.page.goto(self.url_login)
         self.page.fill('form#js-loginForm >> input[name="code"]', self.username)
         self.page.fill('form#js-loginForm >> input[name="password"]', self.password)
@@ -184,6 +183,11 @@ class GoQ:
             original_tab.bring_to_front()
             self.page = original_tab  # Reset internal pointer to original tab
 
+            # Run Orange import for this product
+            if self.orange:
+                print(f"[Action] Running Orange import for product_code: {product_code}")
+                self.orange.start_import()
+
             time.sleep(1)
 
            
@@ -216,62 +220,94 @@ class GoQ:
 
     def process_detail_tab(self, tab,product_code,output_file="details.json"):        
         tab.wait_for_load_state("domcontentloaded")
+        print(f"[DEBUG] Processing detail tab for product_code: {product_code}")
         print("[Process] Extracting customer data...")
         html_content = tab.content()
         with open("debug_page.html", "w", encoding="utf-8") as f:
             f.write(html_content)
+        print("[DEBUG] HTML content saved to debug_page.html")
+        
         target_td = tab.locator('td:has(span.fontsz12)', has_text="送付先").first
         table_element = target_td.locator("xpath=ancestor::table").first        
         receiver_td = table_element.locator("tr").nth(1).locator("td").first        
         receiver_text = receiver_td.inner_text().strip().split("\n")
         receiver_text = [line.strip() for line in receiver_text if line.strip()] 
-        print(receiver_text)
+        print(f"[DEBUG] Raw receiver_text: {receiver_text}")
        
-        name_kana = receiver_text[0]                      # 小塚 毅[コヅカ タケシ]
-        postal_code = receiver_text[1].replace("〒", "").strip()
-        address = receiver_text[2]                        # 愛知県名古屋市守山区大森3丁目411-3
-        phone = receiver_text[3].replace("TEL：", "").strip()
-
-        # Debug
+        full_name_kana = receiver_text[0]
+        name = full_name_kana.split('[')[0].strip()
+        print(f"[DEBUG] Full name with kana: {full_name_kana}")
+        print(f"[DEBUG] Extracted name: {name}")
+                              
+        postal_raw = receiver_text[1].replace("〒", "").strip().replace("-", "")
+        postal1 = postal_raw[:3]
+        postal2 = postal_raw[3:]
+        print(f"[DEBUG] Raw postal: {receiver_text[1]} -> processed: {postal_raw} -> postal1: {postal1}, postal2: {postal2}")
         
-        print("[Name/Kana]", name_kana)
-        print("[Postal Code]", postal_code)
-        print("[Address]", address)
-        print("[Phone]", phone)
-
-    def init_gemini_chat(self):
-        import google.generativeai as genai
-        genai.configure(api_key=self.gemini_api_key)
-
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        self.chat = model.start_chat()
-
-        # Send instruction once
-        instruction = (
-            "Whenever I send a customer's info block (in Japanese), extract:\n"
-            "- name\n- postal_code\n- address\n- phone\n\n"
-            "Return JSON. No explanation."
-        )
-        self.chat.send_message(instruction)
-
-    def ai_information_handle(self, html_block):
-        import json
-
-        response = self.chat.send_message(html_block)
-        try:
-            extracted_data = json.loads(response.text)
-            print(extracted_data)
-        except Exception:
-            print("[Error] Failed to parse:", response.text)
-
-
+        address = receiver_text[2]
+        print(f"[DEBUG] Original address: {address}")
         
+        phone_raw = receiver_text[3].replace("TEL：", "").replace("-", "").strip()
+        phone1 = phone_raw[:3]
+        phone3 = phone_raw[-4:]
+        phone2 = phone_raw[3:-4] 
+        print(f"[DEBUG] Raw phone: {receiver_text[3]} -> processed: {phone_raw} -> phone1: {phone1}, phone2: {phone2}, phone3: {phone3}")
 
-           
-           
+        incharge_name = ""
+        print(f"[DEBUG] Incharge name: {incharge_name}")
+        
+        # Filter address using corporate keywords
+        filtered_address = address
+        for keyword in corp_keywords:
+            if keyword in address:
+                parts = address.split(keyword)
+                if len(parts) > 1:
+                    # Remove the corporate part and keep the address part
+                    filtered_address = parts[-1].strip()
+                    print(f"[DEBUG] Found keyword '{keyword}' in address, filtered to: {filtered_address}")
+                    break
+        
+        # Split filtered address into components
+        address_parts = filtered_address.split()
+        address1 = address_parts[0] if len(address_parts) > 0 else ""
+        address2 = address_parts[1] if len(address_parts) > 1 else ""
+        address3 = " ".join(address_parts[2:]) if len(address_parts) > 2 else ""
+        print(f"[DEBUG] Address parts: address1='{address1}', address2='{address2}', address3='{address3}'")
+        
+        result = {
+        "name": name,
+        "incharge_name": incharge_name,
+        "postal1": postal1,
+        "postal2": postal2,
+        "phone1": phone1,
+        "phone2": phone2,
+        "phone3": phone3,
+        "address1": address1,
+        "address2": address2,
+        "address3": address3
+        }
+        print(f"[DEBUG] Final result: {json.dumps(result, ensure_ascii=False, indent=2)}")
+        
+        with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+        print(f"[Saved] to {output_file}")
+        return result
+
+
+
+
 if __name__ == "__main__":
+    html_block="""
+        山三鋳造(株) 中洋一[ヤマサンチュウゾウカブ ナカヨウイチ]
+〒 722-0037
+広島県尾道市西御所町14-22
+TEL： 0848-23-2001
+"""
     goq=GoQ()
     # goq.log_in()
-    # goq.connect_existing_browser()
-    # goq.searching()
-    goq.init_gemini_chat()
+    
+    goq.connect_existing_browser()
+    goq.searching()
+    # agent = CustomerInfoExtractor(api_key=config.GEMINI_API)
+    # result = agent.extract(html_block)
+    # print(result)
