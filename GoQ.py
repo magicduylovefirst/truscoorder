@@ -35,7 +35,7 @@ class GoQ:
         self.page.fill('form#js-loginForm >> input[name="password"]', self.password)
         self.page.click('form#js-loginForm >> button[type="submit"]')
         #This step will confirm the auth
-        self.page.wait_for_load_state("load")
+        # self.page.wait_for_load_state("load")
         try:
             # Step 1: Check if GoQ login screen appears first
             goq_auth_btn = self.page.locator("button#js-loginGoqAuth")

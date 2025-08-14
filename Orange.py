@@ -80,10 +80,10 @@ class Orange:
                 sender = msg.get("Resent-From") or msg.get("From") or msg.get("Return-Path") or ""
                 if "info-f@first23.com" not in sender:
                     continue
-                print(msg)
+                # print(msg)
 
                 # Get body content
-                print(msg)
+                # print(msg)
                 if msg.is_multipart():
                     for part in msg.walk():
                         if part.get_content_type() == "text/plain":
@@ -106,6 +106,12 @@ class Orange:
             print(f"POP3 Error: {e}")
             return None
     def connect_existing_browser(self):
+        import asyncio
+        import nest_asyncio
+        
+        # Always apply nest_asyncio to handle potential event loop conflicts
+        nest_asyncio.apply()
+        
         from playwright.sync_api import sync_playwright
 
         self.playwright = sync_playwright().start()

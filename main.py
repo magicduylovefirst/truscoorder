@@ -64,8 +64,9 @@ if __name__ == "__main__":
     # rakuraku.close()
     
     
-    goq.log_in()
     orange.log_in()
+    goq.log_in()
+    
     goq.searching()
 
     
