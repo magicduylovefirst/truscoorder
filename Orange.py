@@ -115,6 +115,76 @@ class Orange:
         print(" Connected to Chrome")
 
     
+    def start_import_single(self, product_code, downloaded_file, description):
+        """
+        Process a single record for import without reading from JSON file
+        """
+        try:
+            print(f"[Processing single record for product_code: {product_code}]")
+            
+            # ========== Case: 見積り ==========
+            if "送料別途見積り" in description:
+                self.page.goto(self.MTR_link)
+
+                # Unhide file input
+                self.page.wait_for_selector('button.js-attachmentfile__btn', timeout=self.timeout)
+                self.page.eval_on_selector('input#fileInput', 'el => el.removeAttribute("hidden")')
+
+                # Upload file
+                if downloaded_file:
+                    print(f"Uploading file: {downloaded_file}")
+                    self.page.set_input_files('input#fileInput', downloaded_file)
+                else:
+                    print(f"[Error] Missing 'downloaded_file' for product_code {product_code}")
+                    return {"error": "Missing downloaded_file"}
+
+                # Confirm filename was set in UI
+                filename_field = self.page.query_selector('input#inputFileName')
+                if filename_field:
+                    print("UI shows:", filename_field.input_value())
+
+                
+                self.page.click('#btn-excelin')
+                # Select radio option
+                self.page.wait_for_selector('label:has(input#deliveryKbn_4)')
+                self.page.click('label:has(input#deliveryKbn_4)')
+
+                # Fill product code
+                self.page.wait_for_selector('input#abstr', timeout=self.timeout)
+                # self.page.fill('input#abstr', product_code)
+
+                # Check for error field after filling
+                value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
+
+                if value:
+                    # Check if clickable <a> element exists
+                    warning = self.page.query_selector('p.p-warning--type-02.u-font14')
+                    if warning:
+                        warning_text = warning.text_content().strip()
+                        error_msg = warning_text or f"Cannot order article: {value}"
+                        print(f"[Error] {error_msg}")
+                        return {"error": error_msg}
+                    else:
+                        # All good → click confirm
+                        self.page.click("#btn-estimateConfirm")
+
+                
+                time.sleep(5)
+                return {"status": "success", "type": "見積り"}
+
+            # ========== Case: TRI ==========
+            elif "法人・事業所限定" in description:
+                print(f"[TRI case] Product code: {product_code}")
+                return {"status": "success", "type": "TRI"}
+            
+            else:
+                print(f"[Info] No matching case for product_code: {product_code}")
+                return {"status": "skipped", "reason": "No matching case"}
+                
+        except Exception as e:
+            print(f"[Exception] Error processing product_code {product_code}: {e}")
+            return {"error": str(e)}
+
     def start_import(self):       
         with open(self.file_name, "r", encoding="utf-8") as f:
             datas = json.load(f)
@@ -132,58 +202,11 @@ class Orange:
                 downloaded_file = record.get("downloaded_file")
                 product_code = record.get("product_code")
 
-                # ========== Case: 見積り ==========
-                if "送料別途見積り" in description:
-                    self.page.goto(self.MTR_link)
-
-                    # Unhide file input
-                    self.page.wait_for_selector('button.js-attachmentfile__btn', timeout=self.timeout)
-                    self.page.eval_on_selector('input#fileInput', 'el => el.removeAttribute("hidden")')
-
-                    # Upload file
-                    if downloaded_file:
-                        print(f"Uploading file: {downloaded_file}")
-                        self.page.set_input_files('input#fileInput', downloaded_file)
-                    else:
-                        print(f"[Error] Missing 'downloaded_file' for row {row_id}")
-                        continue
-
-                    # Confirm filename was set in UI
-                    filename_field = self.page.query_selector('input#inputFileName')
-                    if filename_field:
-                        print("UI shows:", filename_field.input_value())
-
-                    
-                    self.page.click('#btn-excelin')
-                    # Select radio option
-                    self.page.wait_for_selector('label:has(input#deliveryKbn_4)')
-                    self.page.click('label:has(input#deliveryKbn_4)')
-
-                    # Fill product code
-                    self.page.wait_for_selector('input#abstr', timeout=self.timeout)
-                    # self.page.fill('input#abstr', product_code)
-
-                    # Check for error field after filling
-                    value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
-
-                    if value:
-                        # Check if clickable <a> element exists
-                        warning = self.page.query_selector('p.p-warning--type-02.u-font14')
-                        if warning:
-                            warning_text = warning.text_content().strip()
-                            record["error"] = warning_text or f"Cannot order article: {value}"
-                            print(f"[Error] {record['error']}")
-                            continue
-                        else:
-                            # All good → click confirm
-                            self.page.click("#btn-estimateConfirm")
-
-                    
-                    time.sleep(5)
-
-                # ========== Case: TRI ==========
-                elif "法人・事業所限定" in description:
-                    print(f"[TRI case] Row ID: {row_id}")
+                # Use the new single import function
+                result = self.start_import_single(product_code, downloaded_file, description)
+                if result.get("error"):
+                    record["error"] = result["error"]
+                
                 datas[row_id] = [record]
         except Exception as e:
             print(f"[Exception] Json Content Error: {e}")

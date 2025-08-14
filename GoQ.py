@@ -185,8 +185,18 @@ class GoQ:
 
             # Run Orange import for this product
             if self.orange:
+                # Get the record data for Orange import
+                record = {}
+                for item in items:
+                    if isinstance(item, dict):
+                        record.update(item)
+                
+                description = record.get("description", "")
+                downloaded_file = record.get("downloaded_file")
+                
                 print(f"[Action] Running Orange import for product_code: {product_code}")
-                self.orange.start_import()
+                result = self.orange.start_import_single(product_code, downloaded_file, description)
+                print(f"[Orange Result] {result}")
 
             time.sleep(1)
 

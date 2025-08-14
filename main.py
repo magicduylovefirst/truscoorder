@@ -54,17 +54,18 @@ if __name__ == "__main__":
 
     orange = Orange(context_orange)
     goq = GoQ(context_goq, orange)
-    rakuraku = Rakuraku(context_raku)
-    rakuraku.log_in()
-    rakuraku.get_page_info()
-    rakuraku. refactor_json()
-    rakuraku.get_download_link()
-    rakuraku.start_download()
-    rakuraku.refactor_json()
+    # rakuraku = Rakuraku(context_raku)
+    # rakuraku.log_in()
+    # rakuraku.get_page_info()
+    # rakuraku. refactor_json()
+    # rakuraku.get_download_link()
+    # rakuraku.start_download()
+    # rakuraku.refactor_json()
     # rakuraku.close()
     
-    orange.log_in()
+    
     goq.log_in()
+    orange.log_in()
     goq.searching()
 
     
