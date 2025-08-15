@@ -7,9 +7,10 @@ import time
 
 from email.parser import BytesParser
 from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 class Orange:
-    def __init__(self,context_orange):
+    def __init__(self, context_orange=None):
         self.url=config.O_URL
         self.company_id=config.O_COMPANY_ID
         self.username=config.O_USER
@@ -121,12 +122,33 @@ class Orange:
         print(" Connected to Chrome")
 
     
-    def start_import_single(self, product_code, downloaded_file, description):
+    def start_import_single(self, product_code, downloaded_file, description,customer_information):
         """
         Process a single record for import without reading from JSON file
+        customer_information is a dict of 
+         {
+        "name": name,
+        "incharge_name": incharge_name,
+        "postal1": postal1,
+        "postal2": postal2,
+        "phone1": phone1,
+        "phone2": phone2,
+        "phone3": phone3,
+        "address1": address1,
+        "address2": address2,
+        "address3": address3
+        }
         """
+        order_no=""
         try:
             print(f"[Processing single record for product_code: {product_code}]")
+            
+            # If no page is available, try to connect or return error
+            if not self.page:
+                if self.context:
+                    self.page = self.context.new_page()
+                else:
+                    return {"error": "No browser context available"}
             
             # ========== Case: 見積り ==========
             if "送料別途見積り" in description:
@@ -151,13 +173,7 @@ class Orange:
 
                 
                 self.page.click('#btn-excelin')
-                # Select radio option
-                self.page.wait_for_selector('label:has(input#deliveryKbn_4)')
-                self.page.click('label:has(input#deliveryKbn_4)')
-
-                # Fill product code
-                self.page.wait_for_selector('input#abstr', timeout=self.timeout)
-                # self.page.fill('input#abstr', product_code)
+                
 
                 # Check for error field after filling
                 value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
@@ -169,14 +185,75 @@ class Orange:
                         warning_text = warning.text_content().strip()
                         error_msg = warning_text or f"Cannot order article: {value}"
                         print(f"[Error] {error_msg}")
-                        return {"error": error_msg}
+                        return error_msg
                     else:
                         # All good → click confirm
+                        # Select radio option
+                        self.page.wait_for_selector('label:has(input#deliveryKbn_4)')
+                        self.page.click('label:has(input#deliveryKbn_4)')
+
+                        # Fill product code
+                        self.page.wait_for_selector('input#abstr', timeout=self.timeout)
+                        self.page.fill('input#abstr', product_code)
+                        self.page.wait_for_load_state("load")
                         self.page.click("#btn-estimateConfirm")
 
-                
+                self.page.wait_for_selector('#directName1', timeout=self.timeout)    
+
+                # pull data (ensure keys exist)
+                ci = customer_information or {}
+                name          =self. _cap20(ci.get("name", ""))
+                incharge_name = self._cap20(ci.get("incharge_name", ""))
+                postal1       = ci.get("postal1", "") or ""
+                postal2       = ci.get("postal2", "") or ""
+                phone1        = ci.get("phone1", "") or ""
+                phone2        = ci.get("phone2", "") or ""
+                phone3        = ci.get("phone3", "") or ""
+                address1      = self._cap20(ci.get("address1", ""))
+                address2      = self._cap20(ci.get("address2", ""))
+                address3      = self._cap20(ci.get("address3", ""))
+
+                # Name / Incharge (全角 20 max per spec)
+                self._fill_if_exists('#directName1', name, "Name (directName1)")
+                self._fill_if_exists('#directName3', incharge_name, "Incharge (directName3)")
+
+                # Postal (half-width expected; ids commonly directZipNo1/2)
+                self._fill_if_exists('#directZipNo1', postal1, "Postal1 (directZipNo1)")
+                self._fill_if_exists('#directZipNo2', postal2, "Postal2 (directZipNo2)")
+
+                # Address lines (20 max each)
+                self._fill_if_exists('#directAddress1', address1, "Address1 (directAddress1)")
+                self._fill_if_exists('#directAddress2', address2, "Address2 (directAddress2)")
+                self._fill_if_exists('#directAddress3', address3, "Address3 (directAddress3)")
+
+                # Phone blocks (half-width digits)
+                self._fill_if_exists('#directTelNo1', phone1, "Phone1 (directTelNo1)")
+                self._fill_if_exists('#directTelNo2', phone2, "Phone2 (directTelNo2)")
+                self._fill_if_exists('#directTelNo3', phone3, "Phone3 (directTelNo3)")
+
+                print("[Info] Finished filling recipient info.")
+                self.page.click("#btn-save")
+                #Next page
+                self.page.wait_for_selector('#btn-save', timeout=self.timeout)
+                self.page.click('#btn-save')
+                self.page.wait_for_load_state("domcontentloaded")
+                #Next page
+                self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
+                self.page.click('#btn-estimateFix')
+                self.page.wait_for_load_state("domcontentloaded")
+                #Last page confirm
+                self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
+                try:
+                    with self.page.expect_event("dialog", timeout=3000) as di:
+                        self.page.click('#btn-estimateFix')
+                    di.value.accept()
+                except PlaywrightTimeoutError:
+                    # No dialog showed up; just ensure the click happened
+                    self.page.click('#btn-estimateFix')
+
+                self.page.wait_for_load_state("domcontentloaded")
                 time.sleep(5)
-                return {"status": "success", "type": "見積り"}
+                return {order_no}
 
             # ========== Case: TRI ==========
             elif "法人・事業所限定" in description:
@@ -190,6 +267,19 @@ class Orange:
         except Exception as e:
             print(f"[Exception] Error processing product_code {product_code}: {e}")
             return {"error": str(e)}
+    def _cap20(s: str) -> str:
+            s = s or ""
+            return s[:20]  # hard cap to 20 chars
+
+    def _fill_if_exists(selector: str, value: str, label: str):
+        loc = self.page.locator(selector)
+        if loc.count() > 0:
+            loc.fill(value)
+            print(f"[Fill] {label}: '{value}' -> {selector}")
+            return True
+        else:
+            print(f"[Skip] {label} not found: {selector}")
+            return False
 
     def start_import(self):       
         with open(self.file_name, "r", encoding="utf-8") as f:
@@ -209,7 +299,8 @@ class Orange:
                 product_code = record.get("product_code")
 
                 # Use the new single import function
-                result = self.start_import_single(product_code, downloaded_file, description)
+                input_infor=""
+                result = self.start_import_single(product_code, downloaded_file, description,input_infor)
                 if result.get("error"):
                     record["error"] = result["error"]
                 

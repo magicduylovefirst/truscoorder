@@ -61,8 +61,7 @@ if __name__ == "__main__":
     # rakuraku.get_download_link()
     # rakuraku.start_download()
     # rakuraku.refactor_json()
-    # rakuraku.close()
-    
+    # rakuraku.close()   
     
     orange.log_in()
     goq.log_in()

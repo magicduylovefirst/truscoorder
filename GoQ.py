@@ -10,6 +10,7 @@ from email.parser import BytesParser
 from playwright.sync_api import sync_playwright
 from playwright.sync_api import TimeoutError #Handle POp up window check
 
+from Orange import Orange
 
 
 class GoQ:
@@ -35,7 +36,7 @@ class GoQ:
         self.page.fill('form#js-loginForm >> input[name="password"]', self.password)
         self.page.click('form#js-loginForm >> button[type="submit"]')
         #This step will confirm the auth
-        self.page.wait_for_load_state("load")
+        # self.page.wait_for_load_state("load")
         try:
             # Step 1: Check if GoQ login screen appears first
             goq_auth_btn = self.page.locator("button#js-loginGoqAuth")
@@ -170,19 +171,12 @@ class GoQ:
             new_tab = page_info.value
 
             # Work with the new tab
-            self.page.screenshot(path="screenshot_after_login.png")
+            # self.page.screenshot(path="screenshot_after_login.png")
             new_tab.wait_for_load_state()
             print("[Info] Opened tab URL:", new_tab.url)
 
-            self.process_detail_tab(new_tab,product_code)
-
-            # Close new tab after processing (optional)
-            new_tab.close()
-
-            # Switch back to original tab
-            original_tab.bring_to_front()
-            self.page = original_tab  # Reset internal pointer to original tab
-
+            customer_information=self.process_detail_tab(new_tab,product_code)
+            
             # Run Orange import for this product
             if self.orange:
                 # Get the record data for Orange import
@@ -195,9 +189,20 @@ class GoQ:
                 downloaded_file = record.get("downloaded_file")
                 
                 print(f"[Action] Running Orange import for product_code: {product_code}")
-                result = self.orange.start_import_single(product_code, downloaded_file, description)
+                result = self.orange.start_import_single(product_code, downloaded_file, description,customer_information)
                 print(f"[Orange Result] {result}")
+            #Orange Input, temporary set as test
+            self.import_result(new_tab, result);
 
+            time.sleep(20)
+            # Close new tab after processing (optional)
+            new_tab.close()
+
+            # Switch back to original tab
+            original_tab.bring_to_front()
+            self.page = original_tab  # Reset internal pointer to original tab
+
+            
             time.sleep(1)
 
            
@@ -228,93 +233,7 @@ class GoQ:
             print(f"[Error] Failed to search or open detail for {product_code}: {e}")
             return None
 
-    def import_result(self, tab, additional_text=""):
-        try:
-            print("[Action] Looking for 対応履歴 table...")
-
-            # 1) Find ALL tables that have a TD containing '対応履歴'
-            candidates = tab.locator('table').filter(has=tab.locator('td:has-text("対応履歴")'))
-            n = candidates.count()
-            if n == 0:
-                print("[Warning] No tables containing '対応履歴'. Dumping page...")
-                with open("page_dump.html", "w", encoding="utf-8") as f:
-                    f.write(tab.content())
-                return False
-
-            print(f"[Info] Found {n} candidate table(s). Saving each for debugging...")
-            chosen_idx = None
-
-            # 2) Save each candidate and pick the best one
-            for i in range(n):
-                t = candidates.nth(i)
-                html = t.evaluate("el => el.outerHTML")
-                with open(f"history_table_candidate_{i}.html", "w", encoding="utf-8") as f:
-                    f.write(html)
-
-                has_datetime_link = t.locator('a:has-text("日時を追加")').count() > 0
-                has_textarea = t.locator("textarea#a52").count() > 0
-
-                print(f"[Info] Candidate {i}: has_datetime_link={has_datetime_link}, has_textarea={has_textarea}")
-
-                # Prefer a table that has the link; fallback to one with the textarea
-                if chosen_idx is None and (has_datetime_link or has_textarea):
-                    chosen_idx = i
-
-            # If still not chosen, default to the last one (often the detailed block)
-            if chosen_idx is None:
-                chosen_idx = n - 1
-                print(f"[Info] No strong match; falling back to candidate {chosen_idx}")
-
-            history_table = candidates.nth(chosen_idx)
-            table_html = history_table.evaluate("el => el.outerHTML")
-            with open("history_table.html", "w", encoding="utf-8") as f:
-                f.write(table_html)
-            print(f"[Saved] history_table.html (chosen candidate {chosen_idx})")
-
-            # 3) Try to get and save the '日時を追加' link HTML (if present)
-            datetime_link = history_table.locator('a:has-text("日時を追加")').first
-            if datetime_link.count() > 0:
-                link_html = datetime_link.evaluate("el => el.outerHTML")
-                with open("datetime_link.html", "w", encoding="utf-8") as f:
-                    f.write(link_html)
-                print("[Saved] datetime_link.html")
-            else:
-                print("[Warning] '日時を追加' link not found in chosen table")
-
-            # 4) Click the link if it exists and is (likely) actionable
-            if datetime_link.count() > 0:
-                print("[Action] Clicking 日時を追加 link...")
-                datetime_link.click()
-                tab.wait_for_timeout(1000)
-
-            # 5) Interact with textarea if present
-            textarea = history_table.locator("textarea#a52")
-            if textarea.count() == 0:
-                print("[Warning] Textarea #a52 not found")
-                return False
-
-            current_content = textarea.input_value()
-            print(f"[Info] Current textarea content: {current_content}")
-
-            if additional_text:
-                new_content = current_content + additional_text
-                textarea.fill(new_content)
-                print(f"[Success] Import result added to textarea: {additional_text}")
-                return new_content
-            else:
-                print("[Success] Datetime added to textarea (no extra text)")
-                return current_content
-
-        except Exception as e:
-            print(f"[Error] Failed to import result: {e}")
-            # Optional: dump page on error
-            try:
-                with open("page_dump_on_error.html", "w", encoding="utf-8") as f:
-                    f.write(tab.content())
-                print("[Saved] page_dump_on_error.html")
-            except Exception:
-                pass
-            return False
+    
 
     def process_detail_tab(self, tab,product_code,output_file="details.json"):        
         tab.wait_for_load_state("domcontentloaded")
@@ -386,10 +305,10 @@ class GoQ:
         "address2": address2,
         "address3": address3
         }
-        
+        #call Orange to get the input result
+       
         # Import result to history table (using the correct tab parameter)
-        self.import_result(tab, additional_text=f"\n処理完了 - 商品コード: {product_code}")
-        time.sleep(20)
+        
         print(f"[DEBUG] Final result: {json.dumps(result, ensure_ascii=False, indent=2)}")
         
         with open(output_file, "w", encoding="utf-8") as f:
@@ -397,16 +316,135 @@ class GoQ:
         print(f"[Saved] to {output_file}")
         return result
 
+    def import_result(self, tab, result):
+        try:
+            print("[Action] Looking for 対応履歴 table...")
 
+            # 1) Find ALL tables that have a TD containing '対応履歴'
+            candidates = tab.locator('table').filter(has=tab.locator('td:has-text("対応履歴")'))
+            n = candidates.count()
+            if n == 0:
+                print("[Warning] No tables containing '対応履歴'. Dumping page...")
+                with open("page_dump.html", "w", encoding="utf-8") as f:
+                    f.write(tab.content())
+                return False
+
+            print(f"[Info] Found {n} candidate table(s). Saving each for debugging...")
+            chosen_idx = None
+
+            # 2) Save each candidate and pick the best one
+            for i in range(n):
+                t = candidates.nth(i)
+                html = t.evaluate("el => el.outerHTML")
+                with open(f"history_table_candidate_{i}.html", "w", encoding="utf-8") as f:
+                    f.write(html)
+
+                has_datetime_link = t.locator('a:has-text("日時を追加")').count() > 0
+                has_textarea = t.locator("textarea#a52").count() > 0
+
+                print(f"[Info] Candidate {i}: has_datetime_link={has_datetime_link}, has_textarea={has_textarea}")
+
+                # Prefer a table that has the link; fallback to one with the textarea
+                if chosen_idx is None and (has_datetime_link or has_textarea):
+                    chosen_idx = i
+
+            # If still not chosen, default to the last one (often the detailed block)
+            if chosen_idx is None:
+                chosen_idx = n - 1
+                print(f"[Info] No strong match; falling back to candidate {chosen_idx}")
+
+            history_table = candidates.nth(chosen_idx)
+            table_html = history_table.evaluate("el => el.outerHTML")
+            print(f"[Saved] history_table.html (chosen candidate {chosen_idx})")
+
+            # 3) Try to get and save the '日時を追加' link HTML (if present)
+            datetime_link = history_table.locator('a:has-text("日時を追加")').first
+
+            # 4) Click the link if it exists and is (likely) actionable
+            if datetime_link.count() > 0:
+                print("[Action] Clicking 日時を追加 link...")
+                datetime_link.click()
+                tab.wait_for_timeout(1000)
+
+            # 5) Interact with textarea if present
+            textarea = history_table.locator("textarea#a52")
+            if textarea.count() == 0:
+                print("[Warning] Textarea #a52 not found")
+                return False
+
+            current_content = textarea.input_value()
+            print(f"[Info] Current textarea content: {current_content}")
+
+            if result:
+                new_content = current_content + result + " デュイ"
+                textarea.fill(new_content)
+                print(f"[Success] Import result added to textarea: {result}")
+                
+            else:
+                print("[Success] Datetime added to textarea (no extra text)")
+            print("[Action] Looking for ひとことメモ table...")
+
+            # 1) Narrow to the first table that has the 'ひとことメモ' label
+            memo_table = tab.locator("table").filter(
+                has=tab.locator('td:has(span.fontsz12:has-text("ひとことメモ"))')
+            ).first
+
+            # Optional: save that table's HTML
+            table_html = memo_table.evaluate("el => el.outerHTML")
+            with open("memo_table.html", "w", encoding="utf-8") as f:
+                f.write(table_html)
+            print("[Saved] memo_table.html")
+
+            # 2) Find its textarea#a9 inside that table
+            textarea = memo_table.locator("textarea#a9").first
+            if textarea.count() == 0:
+                print("[Warning] textarea#a9 not found inside the ひとことメモ table")
+                # Fallback: try global search (in case DOM differs)
+                textarea_global = tab.locator("#a9")
+                if textarea_global.count() == 0:
+                    print("[Warning] Global textarea#a9 not found either")
+                    raise RuntimeError("textarea#a9 not found")
+                textarea = textarea_global.first
+                print("[Info] Using global #a9 fallback")
+
+            # 3) Read current value and re-input the SAME text
+            current_value = textarea.input_value()
+            textarea.fill(result+"\n"+current_value)
+            print("[Success] Re-input the same text into #a9")   
+            #3.5 Change the status
+            select_element = tab.locator('select#a6')
+            if select_element.count() == 0:
+                print("[Warning] 受注ステータス select#a6 not found.")
+                raise RuntimeError("受注ステータス select#a6 not found")
+
+            select_element.select_option("175")
+            
+            
+            # 3) Click the '入力内容を反映する' submit button
+            # submit_btn = tab.locator('input[type="submit"][value="入力内容を反映する"]').first
+            # if submit_btn.count() == 0:
+            #     raise RuntimeError("'入力内容を反映する' button not found")
+
+            # print("[Action] Clicking '入力内容を反映する' button...")
+            # submit_btn.click()
+
+            # # Optional: wait for any processing/navigation after click
+            # tab.wait_for_load_state("domcontentloaded")
+
+        except Exception as e:
+            print(f"[Error] Failed to import result: {e}")
+            # Optional: dump page on error
+            try:
+                with open("page_dump_on_error.html", "w", encoding="utf-8") as f:
+                    f.write(tab.content())
+                print("[Saved] page_dump_on_error.html")
+            except Exception:
+                pass
+            return False
 
 
 if __name__ == "__main__":
-    html_block="""
-        山三鋳造(株) 中洋一[ヤマサンチュウゾウカブ ナカヨウイチ]
-〒 722-0037
-広島県尾道市西御所町14-22
-TEL： 0848-23-2001
-"""
+    
     # Simple test - create GoQ with None context for testing
     goq = GoQ(None)
     
