@@ -169,13 +169,11 @@ class Orange:
                 # Confirm filename was set in UI
                 filename_field = self.page.query_selector('input#inputFileName')
                 if filename_field:
-                    print("UI shows:", filename_field.input_value())
-
-                
+                    print("UI shows:", filename_field.input_value())                
                 self.page.click('#btn-excelin')
                 
 
-                # Check for error field after filling
+                # Check for error field 
                 value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
 
                 if value:
@@ -191,7 +189,7 @@ class Orange:
                         # Select radio option
                         self.page.wait_for_selector('label:has(input#deliveryKbn_4)')
                         self.page.click('label:has(input#deliveryKbn_4)')
-
+                        time.sleep(2)
                         # Fill product code
                         self.page.wait_for_selector('input#abstr', timeout=self.timeout)
                         self.page.fill('input#abstr', product_code)
@@ -267,11 +265,11 @@ class Orange:
         except Exception as e:
             print(f"[Exception] Error processing product_code {product_code}: {e}")
             return {"error": str(e)}
-    def _cap20(s: str) -> str:
+    def _cap20(self,s: str) -> str:
             s = s or ""
             return s[:20]  # hard cap to 20 chars
 
-    def _fill_if_exists(selector: str, value: str, label: str):
+    def _fill_if_exists(self, selector: str, value: str, label: str):
         loc = self.page.locator(selector)
         if loc.count() > 0:
             loc.fill(value)
@@ -298,8 +296,18 @@ class Orange:
                 downloaded_file = record.get("downloaded_file")
                 product_code = record.get("product_code")
 
-                # Use the new single import function
-                input_infor=""
+                # This is testing
+                input_infor={"name": "竹田 紀男",
+                    "incharge_name": "",
+                    "postal1": "134",
+                    "postal2": "0013",
+                    "phone1": "090",
+                    "phone2": "8816",
+                    "phone3": "9449",
+                    "address1": "東京都江戸川区江戸川5-22-70",
+                    "address2": "",
+                    "address3": ""
+                    }
                 result = self.start_import_single(product_code, downloaded_file, description,input_infor)
                 if result.get("error"):
                     record["error"] = result["error"]
@@ -314,4 +322,7 @@ class Orange:
             
     def search_order(self)->str:
         return url
-    
+if __name__=="__main__":
+    orange = Orange()
+    orange.connect_existing_browser()
+    orange.start_import()
