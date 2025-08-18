@@ -25,8 +25,29 @@ class GoQ:
         self.timeout=10000       
         self.main_frame=None
         self.file_name="table_data.json"
+        self.error_file="error.json"
         self.orange = orange_instance
         return
+    
+    def log_error(self, product_code, error_status, error_message=""):
+        try:
+            if os.path.exists(self.error_file):
+                with open(self.error_file, "r", encoding="utf-8") as f:
+                    error_data = json.load(f)
+            else:
+                error_data = {}
+            
+            error_data[product_code] = {
+                "status": error_status,
+                "message": error_message,
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            
+            with open(self.error_file, "w", encoding="utf-8") as f:
+                json.dump(error_data, f, ensure_ascii=False, indent=2)
+                
+        except Exception as e:
+            print(f"[Error] Failed to log error for {product_code}: {e}")
     
     def log_in(self):
         #temporarialy comment out for testing
@@ -160,48 +181,68 @@ class GoQ:
                 print(f"[Warning] Missing product_code for row {row_id}")
                 continue
 
-            print(f"[Action] Searching for product_code: {product_code}")
+            try:
+                print(f"[Action] Searching for product_code: {product_code}")
 
-            # Save current tab
-            original_tab = self.page
+                # Save current tab
+                original_tab = self.page
 
-            # Watch for new tab opening after action
-            with context.expect_page() as page_info:
-                self.search_and_open_order_detail(product_code)  # This should trigger new tab
-            new_tab = page_info.value
+                # Watch for new tab opening after action
+                try:
+                    with context.expect_page() as page_info:
+                        self.search_and_open_order_detail(product_code)  # This should trigger new tab
+                    new_tab = page_info.value
 
-            # Work with the new tab
-            # self.page.screenshot(path="screenshot_after_login.png")
-            new_tab.wait_for_load_state()
-            print("[Info] Opened tab URL:", new_tab.url)
+                    # Work with the new tab
+                    # self.page.screenshot(path="screenshot_after_login.png")
+                    new_tab.wait_for_load_state()
+                    print("[Info] Opened tab URL:", new_tab.url)
 
-            customer_information=self.process_detail_tab(new_tab,product_code)
-            
-            # Run Orange import for this product
-            if self.orange:
-                # Get the record data for Orange import
-                record = {}
-                for item in items:
-                    if isinstance(item, dict):
-                        record.update(item)
+                    customer_information=self.process_detail_tab(new_tab,product_code)
+                    
+                    # Run Orange import for this product only if customer_information was successfully extracted
+                    if customer_information and self.orange:
+                        # Get the record data for Orange import
+                        record = {}
+                        for item in items:
+                            if isinstance(item, dict):
+                                record.update(item)
+                        
+                        description = record.get("description", "")
+                        downloaded_file = record.get("downloaded_file")
+                        
+                        print(f"[Action] Running Orange import for product_code: {product_code}")
+                        result = self.orange.start_import_single(product_code, downloaded_file, description,customer_information)
+                        print(f"[Orange Result] {result}")
+                        #Orange Input, temporary set as test
+                        self.import_result(new_tab, result);
+                    else:
+                        print(f"[Skip] Skipping Orange import for {product_code} due to failed customer information extraction")
+
+                    time.sleep(20)
+                    # Close new tab after processing (optional)
+                    new_tab.close()
+
+                    # Switch back to original tab
+                    original_tab.bring_to_front()
+                    self.page = original_tab  # Reset internal pointer to original tab
+
+                except TimeoutError as te:
+                    print(f"[Timeout] Timeout error for product_code {product_code}: {te}")
+                    self.log_error(product_code, "timeout", str(te))
+                    # Continue to next product instead of breaking
+                    continue
+                except Exception as e:
+                    print(f"[Exception] Error processing product_code {product_code}: {e}")
+                    self.log_error(product_code, "exception", str(e))
+                    # Continue to next product instead of breaking
+                    continue
                 
-                description = record.get("description", "")
-                downloaded_file = record.get("downloaded_file")
-                
-                print(f"[Action] Running Orange import for product_code: {product_code}")
-                result = self.orange.start_import_single(product_code, downloaded_file, description,customer_information)
-                print(f"[Orange Result] {result}")
-            #Orange Input, temporary set as test
-            self.import_result(new_tab, result);
-
-            time.sleep(20)
-            # Close new tab after processing (optional)
-            new_tab.close()
-
-            # Switch back to original tab
-            original_tab.bring_to_front()
-            self.page = original_tab  # Reset internal pointer to original tab
-
+            except Exception as e:
+                print(f"[Exception] General error for product_code {product_code}: {e}")
+                self.log_error(product_code, "general_exception", str(e))
+                # Continue to next product instead of breaking
+                continue
             
             time.sleep(1)
 
@@ -214,7 +255,7 @@ class GoQ:
 
             # 2. Click search
             self.page.click('input#search')
-            self.page.wait_for_selector('#orderlisttable', timeout=5000)
+            self.page.wait_for_selector('#orderlisttable', timeout=self.timeout)
             print(f"[Success] Search result loaded for {product_code}")
 
             # 3. Click the first order detail link (open in new tab)
@@ -229,92 +270,107 @@ class GoQ:
                 print(f"[Warning] No order link found for {product_code}")
                 return None
 
+        except TimeoutError as te:
+            print(f"[Timeout] Timeout error in search_and_open_order_detail for {product_code}: {te}")
+            self.log_error(product_code, "timeout", str(te))
+            return None
         except Exception as e:
             print(f"[Error] Failed to search or open detail for {product_code}: {e}")
+            self.log_error(product_code, "exception", str(e))
             return None
 
     
 
-    def process_detail_tab(self, tab,product_code,output_file="details.json"):        
-        tab.wait_for_load_state("domcontentloaded")
-        print(f"[DEBUG] Processing detail tab for product_code: {product_code}")
-        print("[Process] Extracting customer data...")
-        html_content = tab.content()
-        with open("debug_page.html", "w", encoding="utf-8") as f:
-            f.write(html_content)
-        print("[DEBUG] HTML content saved to debug_page.html")
-        
-        target_td = tab.locator('td:has(span.fontsz12)', has_text="送付先").first
-        table_element = target_td.locator("xpath=ancestor::table").first        
-        receiver_td = table_element.locator("tr").nth(1).locator("td").first        
-        receiver_text = receiver_td.inner_text().strip().split("\n")
-        receiver_text = [line.strip() for line in receiver_text if line.strip()] 
-        print(f"[DEBUG] Raw receiver_text: {receiver_text}")
-       
-        full_name_kana = receiver_text[0]
-        name = full_name_kana.split('[')[0].strip()
-        print(f"[DEBUG] Full name with kana: {full_name_kana}")
-        print(f"[DEBUG] Extracted name: {name}")
-                              
-        postal_raw = receiver_text[1].replace("〒", "").strip().replace("-", "")
-        postal1 = postal_raw[:3]
-        postal2 = postal_raw[3:]
-        print(f"[DEBUG] Raw postal: {receiver_text[1]} -> processed: {postal_raw} -> postal1: {postal1}, postal2: {postal2}")
-        
-        address = receiver_text[2]
-        print(f"[DEBUG] Original address: {address}")
-        
-        phone_raw = receiver_text[3].replace("TEL：", "").replace("-", "").strip()
-        phone1 = phone_raw[:3]
-        phone3 = phone_raw[-4:]
-        phone2 = phone_raw[3:-4] 
-        print(f"[DEBUG] Raw phone: {receiver_text[3]} -> processed: {phone_raw} -> phone1: {phone1}, phone2: {phone2}, phone3: {phone3}")
+    def process_detail_tab(self, tab,product_code,output_file="details.json"):
+        try:        
+            tab.wait_for_load_state("domcontentloaded", timeout=self.timeout)
+            print(f"[DEBUG] Processing detail tab for product_code: {product_code}")
+            print("[Process] Extracting customer data...")
+            html_content = tab.content()
+            with open("debug_page.html", "w", encoding="utf-8") as f:
+                f.write(html_content)
+            print("[DEBUG] HTML content saved to debug_page.html")
+            
+            target_td = tab.locator('td:has(span.fontsz12)', has_text="送付先").first
+            table_element = target_td.locator("xpath=ancestor::table").first        
+            receiver_td = table_element.locator("tr").nth(1).locator("td").first        
+            receiver_text = receiver_td.inner_text().strip().split("\n")
+            receiver_text = [line.strip() for line in receiver_text if line.strip()] 
+            print(f"[DEBUG] Raw receiver_text: {receiver_text}")
+           
+            full_name_kana = receiver_text[0]
+            name = full_name_kana.split('[')[0].strip()
+            print(f"[DEBUG] Full name with kana: {full_name_kana}")
+            print(f"[DEBUG] Extracted name: {name}")
+                                  
+            postal_raw = receiver_text[1].replace("〒", "").strip().replace("-", "")
+            postal1 = postal_raw[:3]
+            postal2 = postal_raw[3:]
+            print(f"[DEBUG] Raw postal: {receiver_text[1]} -> processed: {postal_raw} -> postal1: {postal1}, postal2: {postal2}")
+            
+            address = receiver_text[2]
+            print(f"[DEBUG] Original address: {address}")
+            
+            phone_raw = receiver_text[3].replace("TEL：", "").replace("-", "").strip()
+            phone1 = phone_raw[:3]
+            phone3 = phone_raw[-4:]
+            phone2 = phone_raw[3:-4] 
+            print(f"[DEBUG] Raw phone: {receiver_text[3]} -> processed: {phone_raw} -> phone1: {phone1}, phone2: {phone2}, phone3: {phone3}")
 
-        incharge_name = ""
-        print(f"[DEBUG] Incharge name: {incharge_name}")
-        
-        # Filter address using corporate keywords
-        filtered_address = address
-        for keyword in corp_keywords:
-            if keyword in address:
-                parts = address.split(keyword)
-                if len(parts) > 1:
-                    # Remove the corporate part and keep the address part
-                    filtered_address = parts[-1].strip()
-                    print(f"[DEBUG] Found keyword '{keyword}' in address, filtered to: {filtered_address}")
-                    break
-        
-        # Split filtered address into components
-        # Simple split by 20 characters each
-        addr = filtered_address.strip()
+            incharge_name = ""
+            print(f"[DEBUG] Incharge name: {incharge_name}")
+            
+            # Filter address using corporate keywords
+            filtered_address = address
+            for keyword in corp_keywords:
+                if keyword in address:
+                    parts = address.split(keyword)
+                    if len(parts) > 1:
+                        # Remove the corporate part and keep the address part
+                        filtered_address = parts[-1].strip()
+                        print(f"[DEBUG] Found keyword '{keyword}' in address, filtered to: {filtered_address}")
+                        break
+            
+            # Split filtered address into components
+            # Simple split by 20 characters each
+            addr = filtered_address.strip()
 
-        address1 = addr[:20]
-        address2 = addr[20:40] if len(addr) > 20 else ""
-        address3 = addr[40:60] if len(addr) > 40 else ""
-        print(f"[DEBUG] Address parts: address1='{address1}', address2='{address2}', address3='{address3}'")
-        
-        result = {
-        "name": name,
-        "incharge_name": incharge_name,
-        "postal1": postal1,
-        "postal2": postal2,
-        "phone1": phone1,
-        "phone2": phone2,
-        "phone3": phone3,
-        "address1": address1,
-        "address2": address2,
-        "address3": address3
-        }
-        #call Orange to get the input result
-       
-        # Import result to history table (using the correct tab parameter)
-        
-        print(f"[DEBUG] Final result: {json.dumps(result, ensure_ascii=False, indent=2)}")
-        
-        with open(output_file, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
-        print(f"[Saved] to {output_file}")
-        return result
+            address1 = addr[:20]
+            address2 = addr[20:40] if len(addr) > 20 else ""
+            address3 = addr[40:60] if len(addr) > 40 else ""
+            print(f"[DEBUG] Address parts: address1='{address1}', address2='{address2}', address3='{address3}'")
+            
+            result = {
+            "name": name,
+            "incharge_name": incharge_name,
+            "postal1": postal1,
+            "postal2": postal2,
+            "phone1": phone1,
+            "phone2": phone2,
+            "phone3": phone3,
+            "address1": address1,
+            "address2": address2,
+            "address3": address3
+            }
+            #call Orange to get the input result
+           
+            # Import result to history table (using the correct tab parameter)
+            
+            print(f"[DEBUG] Final result: {json.dumps(result, ensure_ascii=False, indent=2)}")
+            
+            with open(output_file, "w", encoding="utf-8") as f:
+                    json.dump(result, f, ensure_ascii=False, indent=2)
+            print(f"[Saved] to {output_file}")
+            return result
+            
+        except TimeoutError as te:
+            print(f"[Timeout] Timeout error in process_detail_tab for product_code {product_code}: {te}")
+            self.log_error(product_code, "timeout", str(te))
+            return None
+        except Exception as e:
+            print(f"[Exception] Error in process_detail_tab for product_code {product_code}: {e}")
+            self.log_error(product_code, "exception", str(e))
+            return None
 
     def import_result(self, tab, result):
         try:
@@ -431,6 +487,9 @@ class GoQ:
             # # Optional: wait for any processing/navigation after click
             # tab.wait_for_load_state("domcontentloaded")
 
+        except TimeoutError as te:
+            print(f"[Timeout] Timeout error in import_result: {te}")
+            return False
         except Exception as e:
             print(f"[Error] Failed to import result: {e}")
             # Optional: dump page on error
