@@ -63,8 +63,10 @@ if __name__ == "__main__":
     # rakuraku.refactor_json()
     # rakuraku.close()   
     
+    # goq.connect_existing_browser()
     orange.log_in()
     goq.log_in()
+    
     
     goq.searching()
 

@@ -299,7 +299,7 @@ class GoQ:
             print(f"[DEBUG] Raw receiver_text: {receiver_text}")
            
             full_name_kana = receiver_text[0]
-            name = full_name_kana.split('[')[0].strip()
+            name = full_name_kana.split('[')[0].strip().replace(" ","")
             print(f"[DEBUG] Full name with kana: {full_name_kana}")
             print(f"[DEBUG] Extracted name: {name}")
                                   
@@ -324,12 +324,11 @@ class GoQ:
             filtered_address = address
             for keyword in corp_keywords:
                 if keyword in address:
-                    parts = address.split(keyword)
-                    if len(parts) > 1:
-                        # Remove the corporate part and keep the address part
-                        filtered_address = parts[-1].strip()
-                        print(f"[DEBUG] Found keyword '{keyword}' in address, filtered to: {filtered_address}")
-                        break
+                    # Split on the first occurrence of the keyword
+                    parts = address.split(keyword, 1)
+                    filtered_address = (keyword + parts[-1]).strip()
+                    print(f"[DEBUG] Found keyword '{keyword}' in address, filtered to: {filtered_address}")
+                    break
             
             # Split filtered address into components
             # Simple split by 20 characters each
@@ -445,11 +444,11 @@ class GoQ:
                 has=tab.locator('td:has(span.fontsz12:has-text("ひとことメモ"))')
             ).first
 
-            # Optional: save that table's HTML
-            table_html = memo_table.evaluate("el => el.outerHTML")
-            with open("memo_table.html", "w", encoding="utf-8") as f:
-                f.write(table_html)
-            print("[Saved] memo_table.html")
+            # # Optional: save that table's HTML
+            # table_html = memo_table.evaluate("el => el.outerHTML")
+            # with open("memo_table.html", "w", encoding="utf-8") as f:
+            #     f.write(table_html)
+            # print("[Saved] memo_table.html")
 
             # 2) Find its textarea#a9 inside that table
             textarea = memo_table.locator("textarea#a9").first
@@ -486,7 +485,11 @@ class GoQ:
 
             # # Optional: wait for any processing/navigation after click
             # tab.wait_for_load_state("domcontentloaded")
+            # Click 「入力内容を反映する」
+            self.page.click('input[name="B016"]')
 
+            # Wait for the page to update
+            self.page.wait_for_load_state("domcontentloaded")
         except TimeoutError as te:
             print(f"[Timeout] Timeout error in import_result: {te}")
             return False

@@ -129,7 +129,7 @@ class Rakuraku:
                         parts = value.split('-')
                         if len(parts) >= 3:
                             short_code = "-".join(parts[-2:])
-                            updated_list.append({"product_code": short_code})
+                            updated_list[-1]["product_code"] = short_code
                         
                     elif i == 5:
                         updated_list.append({"download_code": value})
