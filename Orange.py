@@ -163,7 +163,6 @@ class Orange:
         "address3": address3
         }
         """
-        order_no=""
         try:
             print(f"[Processing single record for product_code: {product_code}]")
             
@@ -218,46 +217,27 @@ class Orange:
                     # Check for error field 
                     value_field= 'input#detailData1List\\:0\\:articleNameFixed'
                     warning_field='p.p-warning--type-02.u-font14'
-                    if self.page.is_visible(value_field, timeout=500):
+                    value=None
+                    if self.page.is_visible(value_field, timeout=self.timeout):
                         value = self.page.get_attribute(value_field, 'value')
+                        # Fill product code
+                        print("Value: ",value)
+                        self.page.wait_for_selector('input#abstr', timeout=self.timeout)
+                        self.page.fill('input#abstr', product_code)
+                        self.page.wait_for_load_state("load")
+                        self.page.click("#btn-estimateConfirm")
                     warning_text = None
                     if self.page.is_visible(warning_field, timeout=500):
                         warning_el = self.page.query_selector(warning_field)
+                        print("Warning: ",warning_el)
                         if warning_el:
                             warning_text = warning_el.text_content().strip()
-                    # value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
-                    # warning = self.page.query_selector('p.p-warning--type-02.u-font14')
-                    # warning = self.page.query_selector('p.p-warning--type-02.u-font14')
-                    # print("Value: ",value)
-                    # print("Warning: ",warning)
-                    # if value in self.warning_mess:
-                    #     return value
-                    # else:
-                    #     self.page.wait_for_selector('input#abstr', timeout=self.timeout)
-                    #     self.page.fill('input#abstr', product_code)
-                    #     self.page.wait_for_load_state("load")
-                    #     self.page.click("#btn-estimateConfirm")
-
-                    if value:
-                        # Check if clickable <a> element exists
-                        warning = self.page.query_selector('p.p-warning--type-02.u-font14')
-                        # print("Value: ",value)
-                        # print("Warning: ",warning.text_content())                        
-                        if warning:
-                            warning_text = warning.text_content().strip()
                             error_msg = warning_text or f"Cannot order article: {value}"
                             print(f"[Error] {error_msg}")
                             self.log_error(product_code, "order_error", error_msg)
                             return error_msg
-                        else:
-                            # All good → click confirm
-                            
-                            # Fill product code
-                            self.page.wait_for_selector('input#abstr', timeout=self.timeout)
-                            self.page.fill('input#abstr', product_code)
-                            self.page.wait_for_load_state("load")
-                            self.page.click("#btn-estimateConfirm")
-
+                    # value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
+                    # warning = self.page.query_selector('p.p-warning--type-02.u-font14')                                     
                     self.page.wait_for_selector('#directName1', timeout=self.timeout)    
 
                     

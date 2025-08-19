@@ -58,10 +58,11 @@ class GoQ:
         self.page.click('form#js-loginForm >> button[type="submit"]')
         #This step will confirm the auth
         # self.page.wait_for_load_state("load")
+        time.sleep(1)
         try:
             # Step 1: Check if GoQ login screen appears first
             goq_auth_btn = self.page.locator("button#js-loginGoqAuth")
-            if goq_auth_btn.is_visible(timeout=5000):
+            if goq_auth_btn.is_visible(timeout=self.timeout):
                 print("[Info] Found GoQアカウントでログイン button. Clicking it now...")
                 goq_auth_btn.click()
                 self.page.wait_for_load_state("networkidle")  # wait for page to finish loading
@@ -219,7 +220,6 @@ class GoQ:
                     else:
                         print(f"[Skip] Skipping Orange import for {product_code} due to failed customer information extraction")
 
-                    time.sleep(20)
                     # Close new tab after processing (optional)
                     new_tab.close()
 
@@ -414,18 +414,18 @@ class GoQ:
 
             # 3) Try to get and save the '日時を追加' link HTML (if present)
             datetime_link = history_table.locator('a:has-text("日時を追加")').first
-
-            # 4) Click the link if it exists and is (likely) actionable
-            if datetime_link.count() > 0:
-                print("[Action] Clicking 日時を追加 link...")
-                datetime_link.click()
-                tab.wait_for_timeout(1000)
-
-            # 5) Interact with textarea if present
+            
+            # 4) Interact with textarea if present
             textarea = history_table.locator("textarea#a52")
             if textarea.count() == 0:
                 print("[Warning] Textarea #a52 not found")
                 return False
+
+            # 5) Click the link if it exists and is (likely) actionable
+            if datetime_link.count() > 0:
+                print("[Action] Clicking 日時を追加 link...")
+                datetime_link.click()
+                tab.wait_for_timeout(self.timeout)            
 
             current_content = textarea.input_value()
             print(f"[Info] Current textarea content: {current_content}")
@@ -462,10 +462,10 @@ class GoQ:
                 textarea = textarea_global.first
                 print("[Info] Using global #a9 fallback")
 
-            # 3) Read current value and re-input the SAME text
+            # 3) Read current value and re-input 
             current_value = textarea.input_value()
             textarea.fill(result+"\n"+current_value)
-            print("[Success] Re-input the same text into #a9")   
+            print("[Success] Re-input into #a9")   
             #3.5 Change the status
             select_element = tab.locator('select#a6')
             if select_element.count() == 0:
@@ -486,6 +486,7 @@ class GoQ:
             # # Optional: wait for any processing/navigation after click
             # tab.wait_for_load_state("domcontentloaded")
             # Click 「入力内容を反映する」
+            time.sleep(10)
             self.page.click('input[name="B016"]')
 
             # Wait for the page to update

@@ -64,10 +64,8 @@ if __name__ == "__main__":
     # rakuraku.close()   
     
     # goq.connect_existing_browser()
-    orange.log_in()
     goq.log_in()
-    
-    
+    orange.log_in()  
     goq.searching()
 
     
