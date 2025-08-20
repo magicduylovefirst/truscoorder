@@ -5,6 +5,7 @@ import os
 import poplib
 import time
 from var import corp_keywords
+from datetime import datetime
 
 from email.parser import BytesParser
 from playwright.sync_api import sync_playwright
@@ -25,7 +26,8 @@ class GoQ:
         self.timeout=10000       
         self.main_frame=None
         self.file_name="table_data.json"
-        self.error_file="error.json"
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.error_file = f"error_{now}.json"
         self.orange = orange_instance
         return
     
@@ -419,25 +421,25 @@ class GoQ:
             textarea = history_table.locator("textarea#a52")
             if textarea.count() == 0:
                 print("[Warning] Textarea #a52 not found")
-                return False
-
-            # 5) Click the link if it exists and is (likely) actionable
-            if datetime_link.count() > 0:
-                print("[Action] Clicking 日時を追加 link...")
-                datetime_link.click()
-                tab.wait_for_timeout(self.timeout)            
+                return False                      
 
             current_content = textarea.input_value()
             print(f"[Info] Current textarea content: {current_content}")
 
             if result:
-                new_content = current_content + result + " デュイ"
+                new_content =  result + " デュイ\n" + current_content 
                 textarea.fill(new_content)
                 print(f"[Success] Import result added to textarea: {result}")
                 
             else:
                 print("[Success] Datetime added to textarea (no extra text)")
             print("[Action] Looking for ひとことメモ table...")
+            
+            # 5) Click the link if it exists and is (likely) actionable
+            if datetime_link.count() > 0:
+                print("[Action] Clicking 日時を追加 link...")
+                datetime_link.click()
+                tab.wait_for_timeout(self.timeout)  
 
             # 1) Narrow to the first table that has the 'ひとことメモ' label
             memo_table = tab.locator("table").filter(
@@ -476,18 +478,18 @@ class GoQ:
             
             
             # 3) Click the '入力内容を反映する' submit button
-            # submit_btn = tab.locator('input[type="submit"][value="入力内容を反映する"]').first
-            # if submit_btn.count() == 0:
-            #     raise RuntimeError("'入力内容を反映する' button not found")
+            submit_btn = tab.locator('input[type="submit"][value="入力内容を反映する"]').first
+            if submit_btn.count() == 0:
+                raise RuntimeError("'入力内容を反映する' button not found")
 
-            # print("[Action] Clicking '入力内容を反映する' button...")
-            # submit_btn.click()
+            print("[Action] Clicking '入力内容を反映する' button...")
+            submit_btn.click()
 
             # # Optional: wait for any processing/navigation after click
             # tab.wait_for_load_state("domcontentloaded")
             # Click 「入力内容を反映する」
             time.sleep(10)
-            self.page.click('input[name="B016"]')
+            # self.page.click('input[name="B016"]')
 
             # Wait for the page to update
             self.page.wait_for_load_state("domcontentloaded")

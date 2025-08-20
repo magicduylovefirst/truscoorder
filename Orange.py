@@ -214,28 +214,47 @@ class Orange:
                     self.page.click('label:has(input#deliveryKbn_4)')
                     time.sleep(1)
 
-                    # Check for error field 
-                    value_field= 'input#detailData1List\\:0\\:articleNameFixed'
-                    warning_field='p.p-warning--type-02.u-font14'
-                    value=None
-                    if self.page.is_visible(value_field, timeout=self.timeout):
-                        value = self.page.get_attribute(value_field, 'value')
-                        # Fill product code
-                        print("Value: ",value)
-                        self.page.wait_for_selector('input#abstr', timeout=self.timeout)
-                        self.page.fill('input#abstr', product_code)
-                        self.page.wait_for_load_state("load")
-                        self.page.click("#btn-estimateConfirm")
+                    row_idx = 0  # adjust as needed
+
+                    value_field = f'input#detailData1List\\:{row_idx}\\:articleNameFixed'
+                    row_container = f'#detailData1List\\:{row_idx}\\:areaIdItemNameFixed'  # visible box
+                    warning_field = 'p.p-warning--type-02.u-font14'
+
+                    print(value_field)
+
+                    # Fill product code
+                    self.page.wait_for_selector('input#abstr', timeout=self.timeout)
+                    self.page.fill('input#abstr', product_code)
+
+                    # If you want to ensure the row UI is present, check the container (not the hidden input)
+                    try:
+                        _ = self.page.is_visible(row_container, timeout=800)  # True/False, but we won't block on it
+                    except:
+                        pass
+
+                    # Read the hidden input value regardless of visibility
+                    value = None
+                    el = self.page.query_selector(value_field)
+                    if el:
+                        value = el.get_attribute('value')
+                    print("Value:", value)
+
+                    # Proceed to confirm
+                    self.page.wait_for_load_state("load")
+                    self.page.click("#btn-estimateConfirm")
+
+                    # Warning check (visible-only)
                     warning_text = None
                     if self.page.is_visible(warning_field, timeout=500):
                         warning_el = self.page.query_selector(warning_field)
-                        print("Warning: ",warning_el)
+                        print("Warning:", warning_el)
                         if warning_el:
                             warning_text = warning_el.text_content().strip()
                             error_msg = warning_text or f"Cannot order article: {value}"
                             print(f"[Error] {error_msg}")
                             self.log_error(product_code, "order_error", error_msg)
                             return error_msg
+
                     # value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
                     # warning = self.page.query_selector('p.p-warning--type-02.u-font14')                                     
                     self.page.wait_for_selector('#directName1', timeout=self.timeout)    
@@ -261,7 +280,7 @@ class Orange:
                     self._fill_if_exists('#directAddress3', address3, "Address3 (directAddress3)")
 
                     
-
+                    time.sleep(2)
                     print("[Info] Finished filling recipient info.")
                     self.page.click("#btn-save")
                     #Next page
@@ -274,7 +293,8 @@ class Orange:
                     self.page.wait_for_load_state("domcontentloaded")
                     #Last page confirm
                     self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
-                    self.page.once("dialog", lambda dialog: (print(f"[Dialog] {dialog.message}"), dialog.accept()))
+                    #Dialog confirm already working, just comment out in case of testing
+                    # self.page.once("dialog", lambda dialog: (print(f"[Dialog] {dialog.message}"), dialog.accept()))
                     try:
                         with self.page.expect_event("dialog", timeout=3000) as di:
                             self.page.click('#btn-estimateFix')
