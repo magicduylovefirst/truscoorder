@@ -53,9 +53,9 @@ class Rakuraku:
         
         # Now get HTML and text
         main_html = self.main_frame.content()
-        with open("main_frame_after_click.html", "w", encoding="utf-8") as f:
+        with open("html_output/main_frame_after_click.html", "w", encoding="utf-8") as f:
             f.write(main_html)
-        print("Saved main_frame_after_click.html")
+        print("Saved html_output/main_frame_after_click.html")
 
         self.main_frame.wait_for_selector('table#tableRecordFix',timeout=self.timeout)
         table=self.main_frame.query_selector('table#tableRecordFix')

@@ -11,7 +11,7 @@ from email.parser import BytesParser
 from playwright.sync_api import sync_playwright
 from playwright.sync_api import TimeoutError #Handle POp up window check
 
-from Orange import Orange
+from Orange.Orange import Orange
 
 
 class GoQ:
@@ -289,9 +289,9 @@ class GoQ:
             print(f"[DEBUG] Processing detail tab for product_code: {product_code}")
             print("[Process] Extracting customer data...")
             html_content = tab.content()
-            with open("debug_page.html", "w", encoding="utf-8") as f:
+            with open("html_output/debug_page.html", "w", encoding="utf-8") as f:
                 f.write(html_content)
-            print("[DEBUG] HTML content saved to debug_page.html")
+            print("[DEBUG] HTML content saved to html_output/debug_page.html")
             
             target_td = tab.locator('td:has(span.fontsz12)', has_text="送付先").first
             table_element = target_td.locator("xpath=ancestor::table").first        
@@ -382,7 +382,7 @@ class GoQ:
             n = candidates.count()
             if n == 0:
                 print("[Warning] No tables containing '対応履歴'. Dumping page...")
-                with open("page_dump.html", "w", encoding="utf-8") as f:
+                with open("html_output/page_dump.html", "w", encoding="utf-8") as f:
                     f.write(tab.content())
                 return False
 
@@ -393,8 +393,8 @@ class GoQ:
             for i in range(n):
                 t = candidates.nth(i)
                 html = t.evaluate("el => el.outerHTML")
-                with open(f"history_table_candidate_{i}.html", "w", encoding="utf-8") as f:
-                    f.write(html)
+                # with open(f"html_output/history_table_candidate_{i}.html", "w", encoding="utf-8") as f:
+                #     f.write(html)
 
                 has_datetime_link = t.locator('a:has-text("日時を追加")').count() > 0
                 has_textarea = t.locator("textarea#a52").count() > 0
@@ -412,7 +412,6 @@ class GoQ:
 
             history_table = candidates.nth(chosen_idx)
             table_html = history_table.evaluate("el => el.outerHTML")
-            print(f"[Saved] history_table.html (chosen candidate {chosen_idx})")
 
             # 3) Try to get and save the '日時を追加' link HTML (if present)
             datetime_link = history_table.locator('a:has-text("日時を追加")').first
@@ -448,9 +447,9 @@ class GoQ:
 
             # # Optional: save that table's HTML
             # table_html = memo_table.evaluate("el => el.outerHTML")
-            # with open("memo_table.html", "w", encoding="utf-8") as f:
+            # with open("html_output/memo_table.html", "w", encoding="utf-8") as f:
             #     f.write(table_html)
-            # print("[Saved] memo_table.html")
+            # print("[Saved] html_output/memo_table.html")
 
             # 2) Find its textarea#a9 inside that table
             textarea = memo_table.locator("textarea#a9").first
@@ -500,9 +499,9 @@ class GoQ:
             print(f"[Error] Failed to import result: {e}")
             # Optional: dump page on error
             try:
-                with open("page_dump_on_error.html", "w", encoding="utf-8") as f:
+                with open("html_output/page_dump_on_error.html", "w", encoding="utf-8") as f:
                     f.write(tab.content())
-                print("[Saved] page_dump_on_error.html")
+                print("[Saved] html_output/page_dump_on_error.html")
             except Exception:
                 pass
             return False
