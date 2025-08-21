@@ -51,25 +51,14 @@ class Rakuraku:
     #test purpose
     def get_page_info(self):
         
-        # Now get HTML and text
-        main_html = self.main_frame.content()
-        with open("html_output/main_frame_after_click.html", "w", encoding="utf-8") as f:
-            f.write(main_html)
-        print("Saved html_output/main_frame_after_click.html")
+        # # Now get HTML and text
+        # main_html = self.main_frame.content()
+        # with open("html_output/main_frame_after_click.html", "w", encoding="utf-8") as f:
+        #     f.write(main_html)
+        # print("Saved html_output/main_frame_after_click.html")
 
         self.main_frame.wait_for_selector('table#tableRecordFix',timeout=self.timeout)
         table=self.main_frame.query_selector('table#tableRecordFix')
-
-        #Get the headers
-        # headers=[]
-        # headers_row=table.query_selector_all('tr')
-        # for row in headers_row:
-        #     ths=row.query_selector_all('th')
-        #     for th in ths:
-        #         th_id=th.get_attribute('id')
-        #         th_text=th.text_content().strip()
-        #         if th_id and th_text:
-        #             headers.append({'id': th_id, 'text': th_text})
         #Get data rows
         all_rows={}
         BREAK_POINT='発注済'

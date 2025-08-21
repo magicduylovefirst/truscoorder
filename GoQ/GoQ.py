@@ -289,9 +289,9 @@ class GoQ:
             print(f"[DEBUG] Processing detail tab for product_code: {product_code}")
             print("[Process] Extracting customer data...")
             html_content = tab.content()
-            with open("html_output/debug_page.html", "w", encoding="utf-8") as f:
-                f.write(html_content)
-            print("[DEBUG] HTML content saved to html_output/debug_page.html")
+            # with open("html_output/debug_page.html", "w", encoding="utf-8") as f:
+            #     f.write(html_content)
+            # print("[DEBUG] HTML content saved to html_output/debug_page.html")
             
             target_td = tab.locator('td:has(span.fontsz12)', has_text="送付先").first
             table_element = target_td.locator("xpath=ancestor::table").first        
@@ -487,8 +487,8 @@ class GoQ:
             # # Optional: wait for any processing/navigation after click
             # tab.wait_for_load_state("domcontentloaded")
             # Click 「入力内容を反映する」
-            time.sleep(10)
-            # self.page.click('input[name="B016"]')
+            time.sleep(20)
+            self.page.click('input[name="B016"]')
 
             # Wait for the page to update
             self.page.wait_for_load_state("domcontentloaded")

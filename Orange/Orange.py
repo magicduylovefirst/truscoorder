@@ -8,7 +8,7 @@ import time
 from email.parser import BytesParser
 from playwright.sync_api import sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-
+from datetime import datetime
 class Orange:
     def __init__(self, context_orange=None):
         self.url=config.O_URL
@@ -20,7 +20,8 @@ class Orange:
         self.page=None
         self.timeout=10000
         self.file_name="table_data.json"
-        self.error_file="error.json"
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.error_file = f"error_{now}.json"
         self.MTR_link="https://www.orange-book.com/ja/f/view/OB3110S23001.xhtml?definiteFileType=2"
         self.TRI_link="https://www.orange-book.com/ja/f/view/OB3110S23001.xhtml?definiteFileType=1"
         self.warning_mess=["本商品は、廃番商品のため、注文できません。"]
@@ -293,8 +294,7 @@ class Orange:
                     self.page.wait_for_load_state("domcontentloaded")
                     #Last page confirm
                     self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
-                    #Dialog confirm already working, just comment out in case of testing
-                    # self.page.once("dialog", lambda dialog: (print(f"[Dialog] {dialog.message}"), dialog.accept()))
+                    self.page.once("dialog", lambda dialog: (print(f"[Dialog] {dialog.message}"), dialog.accept()))
                     try:
                         with self.page.expect_event("dialog", timeout=3000) as di:
                             self.page.click('#btn-estimateFix')
@@ -308,7 +308,8 @@ class Orange:
                     result_sel = "div.p-panel-10__item p.u-font24"
                     self.page.wait_for_selector(result_sel, timeout=self.timeout)
                     result_text = self.page.text_content(result_sel).strip()
-
+                    time.sleep(20)
+                    time.stop()
                     print(f"[Result] {result_text}")
                     return result_text
                 
