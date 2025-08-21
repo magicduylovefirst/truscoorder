@@ -20,3 +20,10 @@ corp_keywords = [
     # その他特殊法人
     "特別民間法人", "認定特定非営利活動法人",
 ]
+
+# Keywords that should get text AFTER them
+after_keywords = ["(株)", "(有)", "(同)", "(医)", "(宗)", "(社福)", "(学)", "(一社)", "(一財)", "(公社)", "(公財)", "(社)", "(財)", "医療法人", "宗教法人", "社会福祉法人", "学校法人", "更生保護法人",
+    "(医)", "(宗)", "(社福)", "(学)"]
+
+# Address keywords to find text after (for the BEFORE logic)
+address_keywords = ["番号", "町", "丁目", "号", "番地", "条", "区", "市", "県", "都", "府", "道"]

@@ -4,7 +4,7 @@ import config
 import os
 import poplib
 import time
-from var import corp_keywords
+from var import corp_keywords, after_keywords, address_keywords
 from datetime import datetime
 
 from email.parser import BytesParser
@@ -328,8 +328,34 @@ class GoQ:
                 if keyword in address:
                     # Split on the first occurrence of the keyword
                     parts = address.split(keyword, 1)
-                    filtered_address = (keyword + parts[-1]).strip()
-                    print(f"[DEBUG] Found keyword '{keyword}' in address, filtered to: {filtered_address}")
+                    
+                    if keyword in after_keywords:
+                        # Get text AFTER the keyword (current behavior)
+                        filtered_address = (keyword + parts[-1]).strip()
+                        print(f"[DEBUG] Found keyword '{keyword}' in address, getting text AFTER: {filtered_address}")
+                    else:
+                        # Get text BEFORE the keyword, but after the last number, INCLUDING the keyword
+                        before_text = parts[0]
+                        # Find the last number in the before text
+                        import re
+                        # Match any digit (including full-width digits like ６３)
+                        number_matches = list(re.finditer(r'[\d０-９]', before_text))
+                        if number_matches:
+                            # Get position after the last number
+                            last_number_end = number_matches[-1].end()
+                            filtered_address = (before_text[last_number_end:] + keyword).strip()
+                            print(f"[DEBUG] Found keyword '{keyword}' in address, getting text AFTER last number INCLUDING keyword: {filtered_address}")
+                        else:
+                            # No numbers found, take all text before keyword plus the keyword
+                            filtered_address = (before_text + keyword).strip()
+                            print(f"[DEBUG] Found keyword '{keyword}' in address, no numbers found, getting text BEFORE INCLUDING keyword: {filtered_address}")
+                    break
+            
+            # Remove address keywords from the beginning of filtered address
+            for addr_keyword in address_keywords:
+                if filtered_address.startswith(addr_keyword):
+                    filtered_address = filtered_address[len(addr_keyword):].strip()
+                    print(f"[DEBUG] Removed address keyword '{addr_keyword}' from beginning of filtered address: {filtered_address}")
                     break
             
             # Split filtered address into components
