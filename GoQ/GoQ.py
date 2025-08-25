@@ -421,7 +421,6 @@ class GoQ:
                 html = t.evaluate("el => el.outerHTML")
                 # with open(f"html_output/history_table_candidate_{i}.html", "w", encoding="utf-8") as f:
                 #     f.write(html)
-
                 has_datetime_link = t.locator('a:has-text("日時を追加")').count() > 0
                 has_textarea = t.locator("textarea#a52").count() > 0
 
@@ -452,7 +451,7 @@ class GoQ:
             print(f"[Info] Current textarea content: {current_content}")
 
             if result:
-                new_content =  result + " デュイ\n" + current_content 
+                new_content =  result + " デュイ\n自動実行します" + current_content 
                 textarea.fill(new_content)
                 print(f"[Success] Import result added to textarea: {result}")
                 
@@ -513,16 +512,16 @@ class GoQ:
             # # Optional: wait for any processing/navigation after click
             # tab.wait_for_load_state("domcontentloaded")
             # Click 「入力内容を反映する」
-            time.sleep(20)
             self.page.click('input[name="B016"]')
 
             # Wait for the page to update
-            self.page.wait_for_load_state("domcontentloaded")
+            self.page.wait_for_load_state("load")
         except TimeoutError as te:
             print(f"[Timeout] Timeout error in import_result: {te}")
             return False
         except Exception as e:
             print(f"[Error] Failed to import result: {e}")
+            time.sleep(10)
             # Optional: dump page on error
             try:
                 with open("html_output/page_dump_on_error.html", "w", encoding="utf-8") as f:

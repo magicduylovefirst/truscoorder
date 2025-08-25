@@ -173,7 +173,7 @@ class Rakuraku:
                 # Temporaraly we will not handle the case when there are more than 2 lines
                 #As well as update the download file_name                
                 if self.main_frame.query_selector('#record_td_0_1_99-137222'):
-                    continue
+                    download_button = self.create_mitsukomi
                 if "送料別途見積り" in description:
                     download_button = self.create_mitsukomi                
                     
@@ -211,6 +211,7 @@ class Rakuraku:
             print(f"Error creating download directory {download_dir}: {e}")
             return
         # Open the json file to get what to download
+        time.sleep(2)
         try:
             with open(self.file_name, "r", encoding="utf-8") as f:
                 data = json.load(f)

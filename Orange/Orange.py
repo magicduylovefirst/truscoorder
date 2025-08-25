@@ -21,7 +21,7 @@ class Orange:
         self.timeout=10000
         self.file_name="table_data.json"
         now = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.error_file = f"error_{now}.json"
+        self.error_file = f"error/error_{now}.json"
         self.MTR_link="https://www.orange-book.com/ja/f/view/OB3110S23001.xhtml?definiteFileType=2"
         self.TRI_link="https://www.orange-book.com/ja/f/view/OB3110S23001.xhtml?definiteFileType=1"
         self.warning_mess=["本商品は、廃番商品のため、注文できません。"]
@@ -211,9 +211,16 @@ class Orange:
                            
                     self.page.click('#btn-excelin')
                     # Select radio option
-                    self.page.wait_for_selector('label:has(input#deliveryKbn_4)', timeout=self.timeout)
-                    self.page.click('label:has(input#deliveryKbn_4)')
-                    time.sleep(1)
+                    self.page.locator(".p-panel-02__item-wrap").wait_for(state="visible", timeout=self.timeout)
+
+                    # Click the label that contains the text "ユーザー様　直送"
+                    self.page.locator("label.p-panel-02__item.a-toggle", has_text="ユーザー様　直送").click()
+
+                    # Verify the underlying input is checked
+                    self.page.wait_for_function("() => document.querySelector('#deliveryKbn_4')?.checked === true")
+
+
+                    time.sleep(2)
 
                     row_idx = 0  # adjust as needed
 
@@ -246,7 +253,7 @@ class Orange:
 
                     # Warning check (visible-only)
                     warning_text = None
-                    if self.page.is_visible(warning_field, timeout=500):
+                    if self.page.is_visible(warning_field, timeout=self.timeout):
                         warning_el = self.page.query_selector(warning_field)
                         print("Warning:", warning_el)
                         if warning_el:
@@ -294,25 +301,26 @@ class Orange:
                     self.page.wait_for_load_state("domcontentloaded")
                     #Last page confirm
                     self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
+                    self.page.click('#btn-estimateFix')
+                    time.sleep(2)
                     self.page.once("dialog", lambda dialog: (print(f"[Dialog] {dialog.message}"), dialog.accept()))
-                    try:
-                        with self.page.expect_event("dialog", timeout=3000) as di:
-                            self.page.click('#btn-estimateFix')
-                        di.value.accept()
-                    except PlaywrightTimeoutError:
-                        # No dialog showed up; just ensure the click happened
-                        self.page.click('#btn-estimateFix')
+                    #Something is duplicate the diaglog.accept so it is return as failed
+                    # try:
+                    #     with self.page.expect_event("dialog", timeout=3000) as di:
+                    #         self.page.click('#btn-estimateFix')
+                    #     di.value.accept()
+                    # except PlaywrightTimeoutError:
+                    #     # No dialog showed up; just ensure the click happened
+                    #     self.page.click('#btn-estimateFix')
                     # Handle the confirm dialog
                     
-                    self.page.wait_for_load_state("domcontentloaded")
                     result_sel = "div.p-panel-10__item p.u-font24"
+                    print("Till here")
                     self.page.wait_for_selector(result_sel, timeout=self.timeout)
                     result_text = self.page.text_content(result_sel).strip()
-                    time.sleep(20)
-                    time.stop()
+                    time.sleep(3)
                     print(f"[Result] {result_text}")
                     return result_text
-                
                 
                 except PlaywrightTimeoutError as te:
                     print(f"[Timeout] Timeout error for product_code {product_code}: {te}")
