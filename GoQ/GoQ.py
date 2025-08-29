@@ -217,12 +217,24 @@ class GoQ:
                         print(f"[Action] Running Orange import for product_code: {product_code}")
                         #In case of TRI we have to check if is cor or not
                         #Check if name or address has crop key word, if yes do like normal
-                        if "送料別途見積り" not in description and "法人・事業所限定" in description:
-                            for keyword in corp_keywords:
-                                if keyword in customer_information["name"]:
-                                    print(f"[Exception] 発注事件です。自動skip {product_code}: {e}")
-                                    self.log_error(product_code, "exception", str(e))
-                                    continue
+                        skip_import = False
+                        if "法人・事業所限定" in description and "送料別途見積り" not in description:
+                            # Check name + address for corporate keywords
+                            target_text = (
+                                f"{customer_information.get('name', '')} "
+                                f"{customer_information.get('processed_address', customer_information.get('address', ''))}"
+                            )
+                            is_corporate = any(kw in target_text for kw in corp_keywords)
+
+                            if is_corporate:
+                                msg = "法人・事業所限定ですが宛先に法人名が見つかりません。自動skip"
+                                print(f"[Skip] {msg}: {product_code}")
+                                self.log_error(product_code, "skip", msg)
+                                skip_import = True
+
+                        if skip_import:
+                            # skip this product and move to the next one in your outer loop
+                            continue
                                     # Split on the first occurrence of the keyword
                                     
                                     
