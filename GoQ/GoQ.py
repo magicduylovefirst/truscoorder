@@ -215,6 +215,21 @@ class GoQ:
                         downloaded_file = record.get("downloaded_file")
                         
                         print(f"[Action] Running Orange import for product_code: {product_code}")
+                        #In case of TRI we have to check if is cor or not
+                        #Check if name or address has crop key word, if yes do like normal
+                        if "送料別途見積り" not in description and "法人・事業所限定" in description:
+                            for keyword in corp_keywords:
+                                if keyword in customer_information["name"]:
+                                    print(f"[Exception] 発注事件です。自動skip {product_code}: {e}")
+                                    self.log_error(product_code, "exception", str(e))
+                                    continue
+                                    # Split on the first occurrence of the keyword
+                                    
+                                    
+                                    
+                                    
+                                        # Get text BEFORE the keyword, but after the last number, INCLUDING the keyword
+                                       
                         result = self.orange.start_import_single(product_code, downloaded_file, description,customer_information)
                         print(f"[Orange Result] {result}")
                         #Orange Input, temporary set as test

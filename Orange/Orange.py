@@ -187,169 +187,169 @@ class Orange:
             address3      = self._cap20(ci.get("address3", ""))
             
             # ========== Case: 見積り ==========
-            if "送料別途見積り" in description:
-                try:
-                    self.page.goto(self.MTR_link)
+            # if "送料別途見積り" in description:
+            try:
+                self.page.goto(self.MTR_link)
 
-                    # Unhide file input
-                    self.page.wait_for_selector('button.js-attachmentfile__btn', timeout=self.timeout)
-                    self.page.eval_on_selector('input#fileInput', 'el => el.removeAttribute("hidden")')
+                # Unhide file input
+                self.page.wait_for_selector('button.js-attachmentfile__btn', timeout=self.timeout)
+                self.page.eval_on_selector('input#fileInput', 'el => el.removeAttribute("hidden")')
 
-                    # Upload file
-                    if downloaded_file:
-                        print(f"Uploading file: {downloaded_file}")
-                        self.page.set_input_files('input#fileInput', downloaded_file)
-                    else:
-                        print(f"[Error] Missing 'downloaded_file' for product_code {product_code}")
-                        self.log_error(product_code, "missing_file", "Missing downloaded_file")
-                        return {"error": "Missing downloaded_file"}
-                    
-                    # Confirm filename was set in UI
-                    filename_field = self.page.query_selector('input#inputFileName')
-                    if filename_field:
-                        print("UI shows:", filename_field.input_value())     
-                           
-                    self.page.click('#btn-excelin')
-                    # Select radio option
-                    time.sleep(1)
-                    self.page.locator(".p-panel-02__item-wrap").wait_for(state="visible", timeout=self.timeout)
-
-                    # Click the label that contains the text "ユーザー様　直送"
-                    self.page.locator("label.p-panel-02__item.a-toggle", has_text="ユーザー様　直送").click()
-
-                    # Verify the underlying input is checked
-                    self.page.wait_for_function("() => document.querySelector('#deliveryKbn_4')?.checked === true")
-                    time.sleep(2)
-
-                    row_idx = 0  # adjust as needed
-
-                    value_field = f'input#detailData1List\\:{row_idx}\\:articleNameFixed'
-                    row_container = f'#detailData1List\\:{row_idx}\\:areaIdItemNameFixed'  # visible box
-                    warning_field = 'p.p-warning--type-02.u-font14'
-
-                    print(value_field)
-
-                    # Fill product code
-                    self.page.wait_for_selector('input#abstr', timeout=self.timeout)
-                    self.page.fill('input#abstr', product_code)
-
-                    # If you want to ensure the row UI is present, check the container (not the hidden input)
-                    try:
-                        _ = self.page.is_visible(row_container, timeout=800)  # True/False, but we won't block on it
-                    except:
-                        pass
-
-                    # Read the hidden input value regardless of visibility
-                    value = None
-                    el = self.page.query_selector(value_field)
-                    if el:
-                        value = el.get_attribute('value')
-                    print("Value:", value)
-
-                    
-
-                    # Warning check (visible-only)
-                    warning_text = None
-                    if self.page.is_visible(warning_field, timeout=self.timeout):
-                        warning_el = self.page.query_selector(warning_field)
-                        print("Warning:", warning_el)
-                        if warning_el:
-                            warning_text = warning_el.text_content().strip()
-                            error_msg = warning_text or f"Cannot order article: {value}"
-                            print(f"[Error] {error_msg}")
-                            self.log_error(product_code, "order_error", error_msg)
-                            return error_msg
-
-                    # value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
-                    # warning = self.page.query_selector('p.p-warning--type-02.u-font14')                      
-                    # Proceed to confirm
-                    self.page.wait_for_load_state("load")
-                    self.page.click("#btn-estimateConfirm")               
-                    self.page.wait_for_selector('#directName1', timeout=self.timeout)    
-
-                    
-
-                    # Name / Incharge (全角 20 max per spec)
-                    self._fill_if_exists('#directName1', name, "Name (directName1)")
-                    self._fill_if_exists('#directName3', incharge_name, "Incharge (directName3)")
-
-                    # Postal (half-width expected; ids commonly directZipNo1/2)
-                    self._fill_if_exists('#directZipNo1', postal1, "Postal1 (directZipNo1)")
-                    self._fill_if_exists('#directZipNo2', postal2, "Postal2 (directZipNo2)")
-                    
-                    # Phone blocks (half-width digits)
-                    self._fill_if_exists('#directTelNo1', phone1, "Phone1 (directTelNo1)")
-                    self._fill_if_exists('#directTelNo2', phone2, "Phone2 (directTelNo2)")
-                    self._fill_if_exists('#directTelNo3', phone3, "Phone3 (directTelNo3)")
-
-                    # Address lines (20 max each)
-                    self._fill_if_exists('#directAddress1', address1, "Address1 (directAddress1)")
-                    self._fill_if_exists('#directAddress2', address2, "Address2 (directAddress2)")
-                    self._fill_if_exists('#directAddress3', address3, "Address3 (directAddress3)")
-
-                    
-                    time.sleep(2)
-                    print("[Info] Finished filling recipient info.")
-                    self.page.click("#btn-save")
-                    #Next page
-                    self.page.wait_for_selector('#btn-save', timeout=self.timeout)
-                    self.page.click('#btn-save')
-                    self.page.wait_for_load_state("domcontentloaded")
-                    #Next page
-                    self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
-                    self.page.click('#btn-estimateFix')
-                    self.page.wait_for_load_state("domcontentloaded")
-                    time.sleep(2)
-                    #Last page confirm
-                    self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
-                    self.page.click('#btn-estimateFix')                                    
-                    self.page.once("dialog", lambda dialog: (print(f"[Dialog] {dialog.message}"), dialog.accept()))
-                    self.page.click('#btn-estimateFix')      
-                    #Something is duplicate the diaglog.accept so it is return as failed
-                    # try:
-                    #     with self.page.expect_event("dialog", timeout=3000) as di:
-                    #         self.page.click('#btn-estimateFix')
-                    #     di.value.accept()
-                    # except PlaywrightTimeoutError:
-                    #     # No dialog showed up; just ensure the click happened
-                    #     self.page.click('#btn-estimateFix')
-                    # Handle the confirm dialog
-                    
-                    result_sel = "div.p-panel-10__item p.u-font24"
-                    print("Till here")
-                    self.page.wait_for_selector(result_sel, timeout=self.timeout)
-                    result_text = self.page.text_content(result_sel).strip()
-                    time.sleep(3)
-                    print(f"[Result] {result_text}")
-                    return result_text
+                # Upload file
+                if downloaded_file:
+                    print(f"Uploading file: {downloaded_file}")
+                    self.page.set_input_files('input#fileInput', downloaded_file)
+                else:
+                    print(f"[Error] Missing 'downloaded_file' for product_code {product_code}")
+                    self.log_error(product_code, "missing_file", "Missing downloaded_file")
+                    return {"error": "Missing downloaded_file"}
                 
-                except PlaywrightTimeoutError as te:
-                    print(f"[Timeout] Timeout error for product_code {product_code}: {te}")
-                    self.log_error(product_code, "timeout", str(te))
-                    return {"error": "timeout", "continue": True}
-                except Exception as e:
-                    print(f"[Exception] Error in MTR case for product_code {product_code}: {e}")
-                    self.log_error(product_code, "exception", str(e))
-                    return {"error": str(e), "continue": True}
+                # Confirm filename was set in UI
+                filename_field = self.page.query_selector('input#inputFileName')
+                if filename_field:
+                    print("UI shows:", filename_field.input_value())     
+                        
+                self.page.click('#btn-excelin')
+                # Select radio option
+                time.sleep(1)
+                self.page.locator(".p-panel-02__item-wrap").wait_for(state="visible", timeout=self.timeout)
 
-            # ========== Case: TRI ==========
-            elif "法人・事業所限定" in description:
+                # Click the label that contains the text "ユーザー様　直送"
+                self.page.locator("label.p-panel-02__item.a-toggle", has_text="ユーザー様　直送").click()
+
+                # Verify the underlying input is checked
+                self.page.wait_for_function("() => document.querySelector('#deliveryKbn_4')?.checked === true")
+                time.sleep(2)
+
+                row_idx = 0  # adjust as needed
+
+                value_field = f'input#detailData1List\\:{row_idx}\\:articleNameFixed'
+                row_container = f'#detailData1List\\:{row_idx}\\:areaIdItemNameFixed'  # visible box
+                warning_field = 'p.p-warning--type-02.u-font14'
+
+                print(value_field)
+
+                # Fill product code
+                self.page.wait_for_selector('input#abstr', timeout=self.timeout)
+                self.page.fill('input#abstr', product_code)
+
+                # If you want to ensure the row UI is present, check the container (not the hidden input)
                 try:
-                    # if name in vars.corp_keywords or     
-                    print(f"[TRI case] Product code: {product_code}")
-                    return {"status": "success", "type": "TRI"}
-                except PlaywrightTimeoutError as te:
-                    print(f"[Timeout] Timeout error in TRI case for product_code {product_code}: {te}")
-                    self.log_error(product_code, "timeout", str(te))
-                    return {"error": "timeout", "continue": True}
-                except Exception as e:
-                    print(f"[Exception] Error in TRI case for product_code {product_code}: {e}")
-                    self.log_error(product_code, "exception", str(e))
-                    return {"error": str(e), "continue": True}
+                    _ = self.page.is_visible(row_container, timeout=800)  # True/False, but we won't block on it
+                except:
+                    pass
+
+                # Read the hidden input value regardless of visibility
+                value = None
+                el = self.page.query_selector(value_field)
+                if el:
+                    value = el.get_attribute('value')
+                print("Value:", value)
+
+                
+
+                # Warning check (visible-only)
+                warning_text = None
+                if self.page.is_visible(warning_field, timeout=self.timeout):
+                    warning_el = self.page.query_selector(warning_field)
+                    print("Warning:", warning_el)
+                    if warning_el:
+                        warning_text = warning_el.text_content().strip()
+                        error_msg = warning_text or f"Cannot order article: {value}"
+                        print(f"[Error] {error_msg}")
+                        self.log_error(product_code, "order_error", error_msg)
+                        return error_msg
+
+                # value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
+                # warning = self.page.query_selector('p.p-warning--type-02.u-font14')                      
+                # Proceed to confirm
+                self.page.wait_for_load_state("load")
+                self.page.click("#btn-estimateConfirm")               
+                self.page.wait_for_selector('#directName1', timeout=self.timeout)    
+
+                
+
+                # Name / Incharge (全角 20 max per spec)
+                self._fill_if_exists('#directName1', name, "Name (directName1)")
+                self._fill_if_exists('#directName3', incharge_name, "Incharge (directName3)")
+
+                # Postal (half-width expected; ids commonly directZipNo1/2)
+                self._fill_if_exists('#directZipNo1', postal1, "Postal1 (directZipNo1)")
+                self._fill_if_exists('#directZipNo2', postal2, "Postal2 (directZipNo2)")
+                
+                # Phone blocks (half-width digits)
+                self._fill_if_exists('#directTelNo1', phone1, "Phone1 (directTelNo1)")
+                self._fill_if_exists('#directTelNo2', phone2, "Phone2 (directTelNo2)")
+                self._fill_if_exists('#directTelNo3', phone3, "Phone3 (directTelNo3)")
+
+                # Address lines (20 max each)
+                self._fill_if_exists('#directAddress1', address1, "Address1 (directAddress1)")
+                self._fill_if_exists('#directAddress2', address2, "Address2 (directAddress2)")
+                self._fill_if_exists('#directAddress3', address3, "Address3 (directAddress3)")
+
+                
+                time.sleep(2)
+                print("[Info] Finished filling recipient info.")
+                self.page.click("#btn-save")
+                #Next page
+                self.page.wait_for_selector('#btn-save', timeout=self.timeout)
+                self.page.click('#btn-save')
+                self.page.wait_for_load_state("domcontentloaded")
+                #Next page
+                self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
+                self.page.click('#btn-estimateFix')
+                self.page.wait_for_load_state("domcontentloaded")
+                time.sleep(2)
+                #Last page confirm
+                self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
+                self.page.click('#btn-estimateFix')                                    
+                self.page.once("dialog", lambda dialog: (print(f"[Dialog] {dialog.message}"), dialog.accept()))
+                self.page.click('#btn-estimateFix')      
+                #Something is duplicate the diaglog.accept so it is return as failed
+                # try:
+                #     with self.page.expect_event("dialog", timeout=3000) as di:
+                #         self.page.click('#btn-estimateFix')
+                #     di.value.accept()
+                # except PlaywrightTimeoutError:
+                #     # No dialog showed up; just ensure the click happened
+                #     self.page.click('#btn-estimateFix')
+                # Handle the confirm dialog
+                
+                result_sel = "div.p-panel-10__item p.u-font24"
+                print("Till here")
+                self.page.wait_for_selector(result_sel, timeout=self.timeout)
+                result_text = self.page.text_content(result_sel).strip()
+                time.sleep(3)
+                print(f"[Result] {result_text}")
+                return result_text
             
-            else:
-                print(f"[Info] No matching case for product_code: {product_code}")
-                return {"status": "skipped", "reason": "No matching case"}
+            except PlaywrightTimeoutError as te:
+                print(f"[Timeout] Timeout error for product_code {product_code}: {te}")
+                self.log_error(product_code, "timeout", str(te))
+                return {"error": "timeout", "continue": True}
+            except Exception as e:
+                print(f"[Exception] Error in MTR case for product_code {product_code}: {e}")
+                self.log_error(product_code, "exception", str(e))
+                return {"error": str(e), "continue": True}
+
+            # # ========== Case: TRI ==========
+            # elif "法人・事業所限定" in description:
+            #     try:
+            #         # if name in vars.corp_keywords or     
+            #         print(f"[TRI case] Product code: {product_code}")
+            #         return {"status": "success", "type": "TRI"}
+            #     except PlaywrightTimeoutError as te:
+            #         print(f"[Timeout] Timeout error in TRI case for product_code {product_code}: {te}")
+            #         self.log_error(product_code, "timeout", str(te))
+            #         return {"error": "timeout", "continue": True}
+            #     except Exception as e:
+            #         print(f"[Exception] Error in TRI case for product_code {product_code}: {e}")
+            #         self.log_error(product_code, "exception", str(e))
+            #         return {"error": str(e), "continue": True}
+            
+            # else:
+            #     print(f"[Info] No matching case for product_code: {product_code}")
+            #     return {"status": "skipped", "reason": "No matching case"}
                 
         except PlaywrightTimeoutError as te:
             print(f"[Timeout] General timeout error for product_code {product_code}: {te}")
