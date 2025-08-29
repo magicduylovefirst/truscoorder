@@ -60,7 +60,7 @@ class GoQ:
         self.page.click('form#js-loginForm >> button[type="submit"]')
         #This step will confirm the auth
         # self.page.wait_for_load_state("load")
-        time.sleep(1)
+        time.sleep(10)
         try:
             # Step 1: Check if GoQ login screen appears first
             goq_auth_btn = self.page.locator("button#js-loginGoqAuth")
@@ -322,8 +322,9 @@ class GoQ:
             incharge_name = ""
             print(f"[DEBUG] Incharge name: {incharge_name}")
             
-            # Filter address using corporate keywords
-            filtered_address = address
+            # Keep the original address intact
+            processed_address = address  
+
             for keyword in corp_keywords:
                 if keyword in address:
                     # Split on the first occurrence of the keyword
@@ -331,53 +332,52 @@ class GoQ:
                     
                     if keyword in after_keywords:
                         # Get text AFTER the keyword (current behavior)
-                        filtered_address = (keyword + parts[-1]).strip()
-                        print(f"[DEBUG] Found keyword '{keyword}' in address, getting text AFTER: {filtered_address}")
+                        processed_address = (keyword + parts[-1]).strip()
+                        print(f"[DEBUG] Found keyword '{keyword}' in address, getting text AFTER: {processed_address}")
                     else:
                         # Get text BEFORE the keyword, but after the last number, INCLUDING the keyword
                         before_text = parts[0]
-                        # Find the last number in the before text
                         import re
-                        # Match any digit (including full-width digits like ６３)
                         number_matches = list(re.finditer(r'[\d０-９]', before_text))
                         if number_matches:
-                            # Get position after the last number
                             last_number_end = number_matches[-1].end()
-                            filtered_address = (before_text[last_number_end:] + keyword).strip()
-                            print(f"[DEBUG] Found keyword '{keyword}' in address, getting text AFTER last number INCLUDING keyword: {filtered_address}")
+                            processed_address = (before_text[last_number_end:] + keyword).strip()
+                            print(f"[DEBUG] Found keyword '{keyword}' in address, getting text AFTER last number INCLUDING keyword: {processed_address}")
                         else:
-                            # No numbers found, take all text before keyword plus the keyword
-                            filtered_address = (before_text + keyword).strip()
-                            print(f"[DEBUG] Found keyword '{keyword}' in address, no numbers found, getting text BEFORE INCLUDING keyword: {filtered_address}")
+                            processed_address = (before_text + keyword).strip()
+                            print(f"[DEBUG] Found keyword '{keyword}' in address, no numbers found, getting text BEFORE INCLUDING keyword: {processed_address}")
                     break
-            
-            # Remove address keywords from the beginning of filtered address
-            for addr_keyword in address_keywords:
-                if filtered_address.startswith(addr_keyword):
-                    filtered_address = filtered_address[len(addr_keyword):].strip()
-                    print(f"[DEBUG] Removed address keyword '{addr_keyword}' from beginning of filtered address: {filtered_address}")
-                    break
-            
-            # Split filtered address into components
-            # Simple split by 20 characters each
-            addr = filtered_address.strip()
 
-            address1 = addr[:20]
-            address2 = addr[20:40] if len(addr) > 20 else ""
-            address3 = addr[40:60] if len(addr) > 40 else ""
+            # Remove address keywords from the beginning of processed address
+            for addr_keyword in address_keywords:
+                if processed_address.startswith(addr_keyword):
+                    processed_address = processed_address[len(addr_keyword):].strip()
+                    print(f"[DEBUG] Removed address keyword '{addr_keyword}' from beginning of processed address: {processed_address}")
+                    break
+
+            # Split processed address into components
+            full_addr = address.strip()
+            address1 = full_addr[:20]
+            address2 = full_addr[20:40] if len(full_addr) > 20 else ""
+            address3 = full_addr[40:60] if len(full_addr) > 40 else ""
             print(f"[DEBUG] Address parts: address1='{address1}', address2='{address2}', address3='{address3}'")
-            
+
+            # --- Extra condition: if `name` does NOT contain corp keywords ---
+            if not any(corp_key in name for corp_key in corp_keywords) and any(corp_key in processed_address for corp_key in corp_keywords):
+                print(f"[DEBUG] Name '{name}' has no corp keywords, replacing name with filtered address")
+                name, incharge_name = processed_address, name
+
             result = {
-            "name": name,
-            "incharge_name": incharge_name,
-            "postal1": postal1,
-            "postal2": postal2,
-            "phone1": phone1,
-            "phone2": phone2,
-            "phone3": phone3,
-            "address1": address1,
-            "address2": address2,
-            "address3": address3
+                "name": name,
+                "incharge_name": incharge_name,
+                "postal1": postal1,
+                "postal2": postal2,
+                "phone1": phone1,
+                "phone2": phone2,
+                "phone3": phone3,
+                "address1": address1,
+                "address2": address2,
+                "address3": address3
             }
             #call Orange to get the input result
            
@@ -512,10 +512,11 @@ class GoQ:
             # # Optional: wait for any processing/navigation after click
             # tab.wait_for_load_state("domcontentloaded")
             # Click 「入力内容を反映する」
-            self.page.click('input[name="B016"]')
+            # self.page.click('input[name="B016"]')
 
             # Wait for the page to update
             self.page.wait_for_load_state("load")
+            time.sleep(4)
         except TimeoutError as te:
             print(f"[Timeout] Timeout error in import_result: {te}")
             return False

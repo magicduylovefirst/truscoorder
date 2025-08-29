@@ -207,10 +207,11 @@ class Orange:
                     # Confirm filename was set in UI
                     filename_field = self.page.query_selector('input#inputFileName')
                     if filename_field:
-                        print("UI shows:", filename_field.input_value())         
+                        print("UI shows:", filename_field.input_value())     
                            
                     self.page.click('#btn-excelin')
                     # Select radio option
+                    time.sleep(1)
                     self.page.locator(".p-panel-02__item-wrap").wait_for(state="visible", timeout=self.timeout)
 
                     # Click the label that contains the text "ユーザー様　直送"
@@ -218,8 +219,6 @@ class Orange:
 
                     # Verify the underlying input is checked
                     self.page.wait_for_function("() => document.querySelector('#deliveryKbn_4')?.checked === true")
-
-
                     time.sleep(2)
 
                     row_idx = 0  # adjust as needed
@@ -247,9 +246,7 @@ class Orange:
                         value = el.get_attribute('value')
                     print("Value:", value)
 
-                    # Proceed to confirm
-                    self.page.wait_for_load_state("load")
-                    self.page.click("#btn-estimateConfirm")
+                    
 
                     # Warning check (visible-only)
                     warning_text = None
@@ -264,7 +261,10 @@ class Orange:
                             return error_msg
 
                     # value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')
-                    # warning = self.page.query_selector('p.p-warning--type-02.u-font14')                                     
+                    # warning = self.page.query_selector('p.p-warning--type-02.u-font14')                      
+                    # Proceed to confirm
+                    self.page.wait_for_load_state("load")
+                    self.page.click("#btn-estimateConfirm")               
                     self.page.wait_for_selector('#directName1', timeout=self.timeout)    
 
                     
@@ -299,11 +299,12 @@ class Orange:
                     self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
                     self.page.click('#btn-estimateFix')
                     self.page.wait_for_load_state("domcontentloaded")
+                    time.sleep(2)
                     #Last page confirm
                     self.page.wait_for_selector('#btn-estimateFix', timeout=self.timeout)
-                    self.page.click('#btn-estimateFix')
-                    time.sleep(2)
+                    self.page.click('#btn-estimateFix')                                    
                     self.page.once("dialog", lambda dialog: (print(f"[Dialog] {dialog.message}"), dialog.accept()))
+                    self.page.click('#btn-estimateFix')      
                     #Something is duplicate the diaglog.accept so it is return as failed
                     # try:
                     #     with self.page.expect_event("dialog", timeout=3000) as di:

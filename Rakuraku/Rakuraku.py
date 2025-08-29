@@ -113,13 +113,14 @@ class Rakuraku:
                     if i == 1:
                         
                         updated_list.append({"order_number": value})
-                    elif i == 4:                        
+                    elif i == 4:
                         updated_list.append({"product_code": value})
                         parts = value.split('-')
+                        print(parts)
+                        print("[Debug]",value)
                         if len(parts) >= 3:
-                            short_code = "-".join(parts[-2:])
+                            short_code = "-".join(parts[-3:] if len(parts) >= 4 else parts[-2:])
                             updated_list[-1]["product_code"] = short_code
-                        
                     elif i == 5:
                         updated_list.append({"download_code": value})
                     elif i == 6:

@@ -3,3 +3,4 @@ __pycache__/
 *.json
 *.html
 *.png
+Orange/config.py
