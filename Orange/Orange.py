@@ -4,6 +4,7 @@ import config
 import os
 import poplib
 import time
+import csv
 
 from email.parser import BytesParser
 from playwright.sync_api import sync_playwright
@@ -29,20 +30,27 @@ class Orange:
     
     def log_error(self, product_code, error_status, error_message=""):
         try:
-            if os.path.exists(self.error_file):
-                with open(self.error_file, "r", encoding="utf-8") as f:
-                    error_data = json.load(f)
-            else:
-                error_data = {}
+            # Change file extension to .csv
+            csv_file = self.error_file.replace('.json', '.csv')
             
-            error_data[product_code] = {
-                "status": error_status,
-                "message": error_message,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-            }
+            # Check if CSV file exists to determine if we need to write header
+            file_exists = os.path.exists(csv_file)
             
-            with open(self.error_file, "w", encoding="utf-8") as f:
-                json.dump(error_data, f, ensure_ascii=False, indent=2)
+            # Append to CSV file
+            with open(csv_file, "a", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                
+                # Write header if file is new
+                if not file_exists:
+                    writer.writerow(["product_code", "status", "message", "timestamp"])
+                
+                # Write error data
+                writer.writerow([
+                    product_code,
+                    error_status,
+                    error_message,
+                    time.strftime("%Y-%m-%d %H:%M:%S")
+                ])
                 
         except Exception as e:
             print(f"[Error] Failed to log error for {product_code}: {e}")
