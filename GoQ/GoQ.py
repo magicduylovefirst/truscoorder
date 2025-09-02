@@ -27,7 +27,7 @@ class GoQ:
         self.main_frame=None
         self.file_name="table_data.json"
         now = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.error_file = f"error_{now}.json"
+        self.error_file = f"error/error_{now}.json"
         self.orange = orange_instance
         return
     
@@ -82,7 +82,7 @@ class GoQ:
             self.page.click("button#login3")
         except TimeoutError:
             print("[Info] No terms of use appeared — continuing normally.")
-
+        self.page.goto(self.url)
         # Step 3: Handle pop-up window
         self.close_all_popups()
         return
@@ -234,13 +234,10 @@ class GoQ:
 
                         if skip_import:
                             # skip this product and move to the next one in your outer loop
-                            continue
-                                    # Split on the first occurrence of the keyword
-                                    
-                                    
-                                    
-                                    
-                                        # Get text BEFORE the keyword, but after the last number, INCLUDING the keyword
+                            new_tab.close()
+                            original_tab.bring_to_front()
+                            self.page = original_tab  # Reset internal pointer to original tab
+                            continue                                   
                                        
                         result = self.orange.start_import_single(product_code, downloaded_file, description,customer_information)
                         print(f"[Orange Result] {result}")

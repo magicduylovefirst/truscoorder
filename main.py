@@ -62,7 +62,7 @@ if __name__ == "__main__":
     rakuraku. refactor_json()
     rakuraku.get_download_link()
     rakuraku.start_download()
-    rakuraku.refactor_json()
+
 
     
     # goq.connect_existing_browser()
