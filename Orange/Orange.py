@@ -265,7 +265,7 @@ class Orange:
                         warning_text = warning_el.text_content().strip()
                         error_msg = warning_text or f"Cannot order article: {value}"
                         print(f"[Error] {error_msg}")
-                        self.log_error(product_code, "order_error", error_msg)
+                        # self.log_error(product_code, "order_error", error_msg)
                         return error_msg
 
                 # value = self.page.get_attribute('input#detailData1List\\:0\\:articleNameFixed', 'value')

@@ -235,7 +235,7 @@ class GoQ:
                             is_corporate = any(kw in target_text for kw in corp_keywords)
 
                             if is_corporate:
-                                msg = "法人・事業所限定ですが宛先に法人名が見つかりません。自動skip"
+                                msg = "見積でわなく、発注してください。skip"
                                 print(f"[Skip] {msg}: {product_code}")
                                 self.log_error(product_code, "skip", msg)
                                 skip_import = True
