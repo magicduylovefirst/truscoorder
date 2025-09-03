@@ -4,3 +4,4 @@ __pycache__/
 *.html
 *.png
 Orange/config.py
+*.csv

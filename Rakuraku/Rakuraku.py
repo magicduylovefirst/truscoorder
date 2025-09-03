@@ -121,7 +121,40 @@ class Rakuraku:
                     elif i == 5:
                         updated_list.append({"download_code": value})
                     elif i == 6:
-                        updated_list.append({"description": value})
+                        # Build a flat TD map for this row group
+                        flat = {}
+                        for obj in records:
+                            if isinstance(obj, dict):
+                                for k, v in obj.items():
+                                    flat[k] = (v or "").strip() if isinstance(v, str) else ("" if v is None else str(v).strip())
+
+                        #Exact ids
+                        main_id_exact  = "record_td_0_0_99-137226"
+                        extra_id_exact = "record_td_0_1_99-137226"
+
+                        main  = flat.get(main_id_exact, "")
+                        extra = flat.get(extra_id_exact, "")
+
+                        # If exact 0_1 is not present, try any *_1_99-137226 (multi-line row)
+                        if not extra:
+                            import re
+                            for k, v in flat.items():
+                                if re.match(r"^record_td_\d+_1_99-137226$", k) and v:
+                                    extra = v.strip()
+                                    break
+
+                        # If exact 0_0 is not present, try any *_0_99-137226 (main line)
+                        if not main:
+                            import re
+                            for k, v in flat.items():
+                                if re.match(r"^record_td_\d+_0_99-137226$", k) and v:
+                                    main = v.strip()
+                                    break
+
+                        if extra:
+                            updated_list.append({"description": f"送料別途見積り {extra}"})
+                        else:
+                            updated_list.append({"description": main})
                     else:
                         updated_list.append(item)  # keep as-is
 
