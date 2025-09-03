@@ -5,3 +5,5 @@ __pycache__/
 *.png
 Orange/config.py
 *.csv
+build/
+dist/
