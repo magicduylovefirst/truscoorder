@@ -9,7 +9,6 @@ from email.parser import BytesParser
 from playwright.sync_api import sync_playwright
 from playwright.sync_api import TimeoutError #Handle POp up window check
 
-from browser_manager import BrowserManager
 
 from GoQ import GoQ
 from Rakuraku import Rakuraku
@@ -40,12 +39,32 @@ class BrowserManager:
         if self.playwright:
             self.playwright.stop()
         self.started = False
+    def ensure_playwright_browsers():
+    # Try to find a chromium browser; if missing, install it
+        try:
+            from playwright.__main__ import main as playwright_main
+            # Optional: skip if already present
+            # Default cache dir on Windows: %USERPROFILE%\AppData\Local\ms-playwright
+            cache_dir = Path(os.environ.get("USERPROFILE", "")) / "AppData" / "Local" / "ms-playwright"
+            if not cache_dir.exists() or not any(cache_dir.glob("**/chrome.exe")):
+                print("Installing Playwright browsers (chromium)...")
+                playwright_main(["install", "chromium"])
+        except Exception as e:
+            print("Playwright auto-install failed:", e)
+            # Try to install anyway
+            try:
+                from playwright.__main__ import main as playwright_main
+                print("Attempting to install browsers...")
+                playwright_main(["install", "chromium"])
+            except Exception as e2:
+                print("Second attempt failed:", e2)
+   
     
 if __name__ == "__main__":
     
-    
-
+    # Ensure Playwright browsers are installed
     manager = BrowserManager()
+    manager.ensure_playwright_browsers()
     manager.start()
 
     context_goq = manager.new_context()

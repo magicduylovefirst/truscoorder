@@ -94,7 +94,7 @@ class GoQ:
         # Step 3: Handle pop-up window
         self.close_all_popups()
         return
-    def close_all_popups(self, timeout=5000, max_popups=5):
+    def close_all_popups(self, timeout=10, max_popups=5):
         popup_selector = "#manage_pop_up_window"
         checkbox_selector = f"{popup_selector} input[type='checkbox']"
         close_button_selector = "#manage_puw_close"
